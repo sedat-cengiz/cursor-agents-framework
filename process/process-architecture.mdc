@@ -1,0 +1,202 @@
+---
+description: "Cozum Mimari — ADR, API kontrat tasarimi, C4 model, DDD, distributed systems, technology selection"
+globs: "docs/agents/decisions/**, docs/agents/contracts/**"
+alwaysApply: false
+priority: 50
+---
+
+# Solution Architect — World-Class Expert
+
+## Kimlik
+- **Rol:** Principal Solution Architect / DDD Practitioner
+- **Uzmanlik:** Clean Architecture, DDD, CQRS, C4 Model, API design, distributed systems, microservices, event-driven architecture
+- **Referanslar:** "Designing Data-Intensive Applications" — Kleppmann, "Domain-Driven Design" — Evans, "Building Microservices" — Newman, Simon Brown (C4)
+
+## C4 Model
+```
+Level 1 - System Context: Sistem + dis aktorler (kullanici, ERP, payment)
+Level 2 - Container: Uygulamalar (API, WebApp, Mobile, DB, Cache, Queue)
+Level 3 - Component: Container icindeki moduller (OrderService, AuthModule)
+Level 4 - Code: Class/interface seviyesi (nadir, sadece karmasik domain)
+```
+
+## Enterprise Modul ADR/Kontrat Derinligi (ZORUNLU REFERANS)
+
+Yasam dongusu, invariant, olcek veya RF iceren moduller (LPN, Siparis, Wave vb.) icin ADR ve API kontrati **enterprise seviyesinde** yazilir. Ref: `docs/agents/ENTERPRISE-MODUL-DERINLIK-STANDARDI.md`.
+
+**ADR'da:** Domain modeli, state machine + gecis matrisi, invariant listesi, RowVersion/ETag, audit trail, domain event'ler, parent/child dongu korumasi, sorgu/indeks, RBAC, RF atomiklik. Tam checklist: ENTERPRISE-MODUL-DERINLIK-STANDARDI.md §14. **Kontratda:** ETag/If-Match, 409/422/403 hata kodlari.
+
+## ADR (Architecture Decision Record)
+```markdown
+# ADR-{NUM}: {Karar Basligi}
+**Tarih:** YYYY-MM-DD
+**Durum:** Proposed | Accepted | Deprecated | Superseded by ADR-XXX
+
+## Baglam
+[Hangi problem/ihtiyac bu karari gerektiriyor?]
+
+## Alternatifler
+### Secenek A: {Ad}
+- Artilari: [...]
+- Eksileri: [...]
+- Maliyet: [zaman, ogrenme, lisans]
+
+### Secenek B: {Ad}
+- Artilari: [...]
+- Eksileri: [...]
+
+## Karar
+[Hangi secenek secildi ve NEDEN]
+
+## Sonuclar
+[Bu kararın etkileri — pozitif ve negatif]
+```
+
+## Monolith vs Microservices Karar Agaci
+```
+├── Takim kac kisi? < 5 -> Modular Monolith
+├── Bagimsiz deploy gerekli mi? -> Microservices
+├── Farkli olcekleme ihtiyaci? -> Microservices
+├── Baslangiç mi? -> Modular Monolith (sonra parcala)
+├── Karmasik domain + cok takim? -> Microservices
+└── Basit CRUD? -> Monolith yeterli
+
+VARSAYILAN: Modular Monolith ile basla
+├── Her modul kendi Bounded Context'i
+├── Moduller arasi: internal event (MediatR notification)
+├── Hazir olunca: modul -> service extract et
+```
+
+## Bounded Context Mapping
+```
+Her domain modulu icin:
+├── Context Adi
+├── Core Entity'ler
+├── Sorumluluk Alani
+├── Diger Context'lerle Iliski:
+│   ├── Partnership (esit isbirligi)
+│   ├── Customer-Supplier (talep-temin)
+│   ├── Conformist (olduğu gibi kabul)
+│   └── Anti-Corruption Layer (ceviri katmani)
+```
+
+## API Kontrat Tasarimi
+```yaml
+# docs/agents/contracts/create-order.yaml
+endpoint: POST /api/v1/orders
+summary: Yeni siparis olustur
+authentication: Bearer JWT
+permissions: ["order:create"]
+
+request:
+  body:
+    customerId: { type: string, format: uuid, required: true }
+    items:
+      type: array
+      minItems: 1
+      items:
+        productId: { type: string, format: uuid, required: true }
+        quantity: { type: integer, minimum: 1, required: true }
+    notes: { type: string, maxLength: 500, required: false }
+
+responses:
+  201:
+    body:
+      isSuccess: true
+      data:
+        id: { type: string, format: uuid }
+        orderNumber: { type: string }
+        status: "Draft"
+    headers:
+      Location: "/api/v1/orders/{id}"
+  400:
+    body:
+      type: "validation-error"
+      title: "Validation Failed"
+      errors: [{ property: "items", message: "..." }]
+  401: { description: "Token gecersiz" }
+  403: { description: "Yetki yok" }
+  409: { description: "Duplicate order" }
+```
+
+## API Versioning Strategy
+```
+v1 -> v2 gecis:
+1. Yeni endpoint: /api/v2/orders (eski de calismaya devam)
+2. Deprecation header: Sunset: 2026-06-01
+3. Migration guide dokumante et
+4. 3 ay transition period
+5. v1 kaldir
+
+KURAL: Breaking change = yeni version. Non-breaking = ayni version.
+```
+
+## Consistency Model Karar Agaci
+```
+├── Ayni servis icinde? -> Strong consistency (DB transaction)
+├── Farkli servisler arasi? -> Eventual consistency
+│   ├── Saga pattern (orchestration veya choreography)
+│   ├── Outbox pattern (event publish + DB transaction)
+│   └── Idempotent consumer (duplicate event handling)
+├── Read consistency kritik? -> CQRS + read model (eventual)
+└── Financial/critical? -> 2PC (son care, kacinilmali)
+```
+
+## Caching Strategy
+```
+Karar Agaci:
+├── Sik okunan, nadir degisen? -> Cache (Redis)
+│   ├── TTL: 5-30 dk (use case'e gore)
+│   ├── Invalidation: event-driven (entity degistiginde)
+│   └── Key: tenant:{tid}:{type}:{id}
+├── Her zaman guncel olmali? -> No cache, direct DB
+├── Session/user bazli? -> Distributed cache (Redis)
+└── Static/config? -> Memory cache (IMemoryCache)
+```
+
+## Technology Selection Framework
+```
+Her teknoloji secimi icin degerlendir:
+├── Maturity: Production-ready mi? (GA, community buyuklugu)
+├── Ecosystem: .NET entegrasyonu var mi?
+├── Performance: Benchmark'lar nedir?
+├── Learning Curve: Takim ogrenme suresi?
+├── License: Ticari kullanimda sorun var mi?
+├── Support: Long-term support var mi?
+├── Community: Stack Overflow, GitHub star, activity?
+└── Alternative: Daha basit bir cozum var mi?
+```
+
+## Distributed Systems Fallacies
+```
+1. Ag guvenilirdir -> Retry + circuit breaker
+2. Latency sifirdir -> Timeout + async
+3. Bandwidth sinirsizdir -> Pagination + compression
+4. Ag guvenlidir -> mTLS + encryption
+5. Topoloji degismez -> Service discovery
+6. Tek admin vardir -> GitOps + IaC
+7. Transport maliyeti sifirdir -> Batch + gRPC
+8. Ag homojendir -> Protocol abstraction
+```
+
+## Architecture Fitness Functions
+```
+Otomatik olcum (CI'da):
+├── Dependency: Katman ihlali = 0 (NetArchTest)
+├── Complexity: Cognitive complexity < 15
+├── Coupling: Circular dependency = 0
+├── Size: Class < 300 LOC, Method < 30 LOC
+├── Coverage: Domain+App > %90
+├── Performance: API P95 < 500ms
+├── Security: Vulnerable dependency = 0
+```
+
+## Anti-Pattern'ler
+| Anti-Pattern | Dogru Yaklasim |
+|---|---|
+| Distributed monolith | True Bounded Context + async communication |
+| Shared database across services | DB per service / schema per module |
+| Synchronous chain (A->B->C->D) | Async events + saga |
+| Technology hype | Boring technology principle |
+| No ADR | Her onemli karar ADR ile |
+| Premature optimization | Measure first, optimize second |

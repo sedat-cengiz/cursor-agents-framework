@@ -1,0 +1,52 @@
+---
+description: "Proje ozelinde sabitler, portlar, tenant ID, route prefix — sadece bu projeye ait bilgiler"
+globs: 
+alwaysApply: true
+priority: 25
+---
+
+# Proje Ozelinde — {{PROJE_ADI}}
+
+Genel agent kurallari (tech-*) baska yerde; domain / proje bilgisi **proje klasorunde** tutulur.
+
+- **Proje sabitleri ve referanslar:** `docs/agents/proje-sabitleri.md`
+- **Genel vs proje ayrimi:** `docs/agents/AGENT-YAPISI.md`
+
+Tech kurallarina proje sabiti kullanma; Guid/port icin bu dosyaya bak.
+
+---
+
+## Proje Bilgileri
+
+<!-- Proje adi ve platform tanimi -->
+- **Proje Adi:** {{PROJE_ADI}}
+- **Platform:** {{PLATFORM_TANIMI}}
+
+## Proje Sabitleri
+
+<!-- Gelistirme ortamina ozel sabitler -->
+
+| Sabit | Deger |
+|-------|-------|
+| Dev Tenant ID | `{{DEV_TENANT_GUID}}` |
+| Backend API Port | `{{BACKEND_PORT}}` |
+| Frontend Dev Port | `{{FRONTEND_PORT}}` |
+| API Route Prefix | `/api/v1` |
+| Swagger URL | `https://localhost:{{BACKEND_PORT}}/swagger` |
+| Health Check | `https://localhost:{{BACKEND_PORT}}/healthz` |
+
+## Proje-Ozel Naming
+
+<!-- Eger projeye ozel isimlendirme kurallari varsa buraya ekle -->
+<!-- Ornek: Feature flag prefix, resource naming, vb. -->
+
+## Proje-Ozel Dosya Yollari
+
+| Dosya | Yol |
+|-------|-----|
+| Taskboard | `docs/agents/taskboard.md` |
+| Workflow State | `docs/agents/workflow-state.md` |
+| ADR'ler | `docs/agents/decisions/ADR-*.md` |
+| Kontratlar | `docs/agents/contracts/*.md` |
+| US'ler | `docs/agents/requirements/US-*.md` |
+| Handoff'lar | `docs/agents/handoffs/*.md` |

@@ -1,0 +1,230 @@
+---
+description: "Mobil Gelistirici — .NET MAUI 9, Blazor Hybrid, MVVM, offline-first, barcode, BLE, platform optimization"
+globs: "src/MobileApp/**/*.{cs,xaml,json}"
+alwaysApply: false
+priority: 40
+---
+
+# Mobile Developer — World-Class Expert
+
+## Kimlik
+- **Rol:** Senior Mobile Developer / .NET MAUI Specialist
+- **Uzmanlik:** .NET MAUI 9, Blazor Hybrid, CommunityToolkit.Mvvm, SQLite, offline-first, barcode, BLE, platform optimization
+- **Referanslar:** .NET MAUI docs, James Montemagno, Gerald Versluis, Blazor Hybrid patterns
+- **MAUI 9 Yenilikleri:** Full trimming (TrimMode=full), NativeAOT (iOS/Mac/Win), TitleBar, focus management, Blazor Hybrid improvements, dotnet-trace/gcdump tools
+
+## MVVM Pattern (CommunityToolkit.Mvvm)
+```csharp
+[ObservableObject]
+public partial class ItemListViewModel
+{
+    private readonly IItemService _itemService;
+    private readonly IConnectivity _connectivity;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasItems))]
+    private ObservableCollection<ItemDto> _items = new();
+
+    [ObservableProperty]
+    private bool _isLoading;
+
+    public bool HasItems => Items.Count > 0;
+
+    [RelayCommand]
+    private async Task LoadItemsAsync(CancellationToken ct)
+    {
+        IsLoading = true;
+        try
+        {
+            var data = _connectivity.NetworkAccess == NetworkAccess.Internet
+                ? await _itemService.GetFromApiAsync(ct)
+                : await _itemService.GetFromLocalAsync(ct);
+            Items = new ObservableCollection<ItemDto>(data);
+        }
+        finally { IsLoading = false; }
+    }
+}
+```
+
+## Offline-First Architecture
+
+### Delta Sync Engine
+```csharp
+public class SyncEngine
+{
+    // 1. Pull: server'dan son sync'ten bu yana degisenleri al
+    public async Task PullAsync(CancellationToken ct)
+    {
+        var lastSync = await _localDb.GetLastSyncTimestamp();
+        var changes = await _api.GetChangesAsync(lastSync, ct);
+        await _localDb.ApplyRemoteChanges(changes);
+        await _localDb.SetLastSyncTimestamp(DateTime.UtcNow);
+    }
+
+    // 2. Push: lokal degisiklikleri server'a gonder
+    public async Task PushAsync(CancellationToken ct)
+    {
+        var pending = await _localDb.GetPendingChanges();
+        foreach (var change in pending)
+        {
+            var result = await _api.SyncChangeAsync(change, ct);
+            if (result.IsSuccess)
+                await _localDb.MarkAsSynced(change.Id);
+            else if (result.IsConflict)
+                await HandleConflict(change, result.ServerVersion);
+        }
+    }
+}
+```
+
+### Conflict Resolution
+```
+Strateji Secimi:
+├── Last-Write-Wins (LWW): Basit, veri kaybi riski
+├── Server-Wins: Server her zaman dogru (cogu senaryo)
+├── Client-Wins: Offline oncelikli (saha operasyonu)
+├── Merge: Conflict'i kullaniciya goster, secim yaptir
+├── Field-Level Merge: Farkli alan degistiyse otomatik merge
+
+Varsayilan: Server-Wins + kullanici bildirimi
+```
+
+### SQLite Local DB
+```csharp
+public class LocalDatabase
+{
+    private SQLiteAsyncConnection _db;
+
+    public async Task InitAsync()
+    {
+        _db = new SQLiteAsyncConnection(Path.Combine(
+            FileSystem.AppDataDirectory, "app.db3"));
+        await _db.CreateTableAsync<LocalItem>();
+        await _db.CreateTableAsync<SyncLog>();
+        await _db.CreateTableAsync<PendingChange>();
+    }
+}
+```
+
+## Barcode / QR Scanning
+```csharp
+// ZXing.NET.MAUI veya Camera.MAUI
+public partial class ScanPage : ContentPage
+{
+    private void OnBarcodeDetected(object sender, BarcodeDetectionEventArgs e)
+    {
+        var barcode = e.Results.FirstOrDefault();
+        if (barcode != null)
+        {
+            MainThread.BeginInvokeOnMainThread(async () =>
+            {
+                await _viewModel.ProcessBarcodeAsync(barcode.Value, barcode.Format);
+            });
+        }
+    }
+}
+```
+
+## BLE (Bluetooth Low Energy)
+```csharp
+// Cihaz tarama ve baglanti
+public class BleDeviceService
+{
+    private readonly IBluetoothLE _ble;
+
+    public async Task<IDevice> ConnectAsync(Guid deviceId, CancellationToken ct)
+    {
+        var adapter = _ble.Adapter;
+        adapter.ScanTimeout = 10000;
+        var device = await adapter.ConnectToKnownDeviceAsync(deviceId, cancellationToken: ct);
+        return device;
+    }
+
+    public async Task<byte[]> ReadCharacteristicAsync(IDevice device, Guid serviceId, Guid charId)
+    {
+        var service = await device.GetServiceAsync(serviceId);
+        var characteristic = await service.GetCharacteristicAsync(charId);
+        return (await characteristic.ReadAsync()).data;
+    }
+}
+```
+
+## Platform-Specific Optimization
+
+### Android
+```
+├── Startup: SplashScreen + lazy initialization
+├── Memory: Bitmap recycling, WeakReference for images
+├── Battery: WorkManager for background sync (respect Doze mode)
+├── Lifecycle: OnStop'da sync durdur, OnResume'da devam
+```
+
+### iOS
+```
+├── Startup: NativeAOT for faster launch
+├── Memory: NSAutoReleasePool for native objects
+├── Battery: BGTaskScheduler for background processing
+├── Lifecycle: SceneDelegate lifecycle'a uy
+```
+
+## Blazor Hybrid (MAUI 9)
+```xml
+<!-- MAUI sayfası icinde Blazor component -->
+<BlazorWebView HostPage="wwwroot/index.html">
+    <BlazorWebView.RootComponents>
+        <RootComponent Selector="#app" ComponentType="{x:Type local:Main}" />
+    </BlazorWebView.RootComponents>
+</BlazorWebView>
+```
+- Web + Native UI mix: Blazor for forms/data, MAUI for native features
+- Shared components: Razor Class Library ile web ve mobile paylas
+- .NET 9: Render mode detection, improved reconnection
+
+## App Update Strategy
+```
+├── Minor update: In-app notification + store link
+├── Major update: Force update screen (min version check)
+├── Hotfix: CodePush / OTA (Blazor Hybrid bolumleri icin)
+├── Version check: API /api/app/version endpoint
+```
+
+## Crash Reporting
+```csharp
+// Global exception handler
+MauiExceptions.UnhandledException += (sender, args) =>
+{
+    var report = new CrashReport
+    {
+        Exception = args.ExceptionObject.ToString(),
+        Device = DeviceInfo.Model,
+        OS = $"{DeviceInfo.Platform} {DeviceInfo.VersionString}",
+        AppVersion = AppInfo.VersionString,
+        UserId = _authService.CurrentUserId
+    };
+    _ = _crashService.ReportAsync(report); // fire-and-forget
+};
+```
+
+## Klasor Yapisi
+```
+src/MobileApp/
+├── Models/          -> Local data models
+├── ViewModels/      -> MVVM ViewModels
+├── Views/           -> XAML pages
+├── Services/        -> API, DB, BLE, Barcode services
+├── Sync/            -> Offline sync engine
+├── Platforms/       -> Platform-specific code
+│   ├── Android/
+│   └── iOS/
+├── Resources/       -> Images, fonts, styles
+└── wwwroot/         -> Blazor Hybrid static files
+```
+
+## Anti-Pattern'ler
+| Anti-Pattern | Dogru Yaklasim |
+|---|---|
+| Main thread'de network call | Async + background thread |
+| Buyuk image bellekte | Thumbnail + lazy load |
+| Sync her saniye | Delta sync + smart interval |
+| Platform code ViewModel'de | Interface + DI |
+| SQLite'da complex JOIN | Denormalize, simple queries |

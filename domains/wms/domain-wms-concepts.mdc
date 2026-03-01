@@ -1,0 +1,130 @@
+---
+description: "WMS Domain — Depo yonetimi kavramlari, entity'ler, roller, is kurallari, terminoloji"
+globs: 
+alwaysApply: false
+priority: 60
+---
+
+# Domain: WMS (Warehouse Management System)
+
+## Domain Tanimi
+Depoya giren, depoda saklanan ve depodan cikan tum malzemelerin yonetimi. Stok dogrulugu, islem hizi ve maliyet optimizasyonu ana hedefler.
+
+## Referanslar
+- SAP EWM, Microsoft Dynamics 365 WMS, Manhattan Active WMS, Oracle WMS Cloud, Axata WMS
+- GS1 standartlari (barkod, GTIN, SSCC)
+- APICS/ASCM Supply Chain terminolojisi
+
+## Terimler Sozlugu
+| Terim (TR) | English | Tanim |
+|------------|---------|-------|
+| Mal Kabul | Receiving | Depoya malzeme girisi |
+| Yerlestime | Putaway | Mal kabul sonrasi rafa yerlestirme |
+| Toplama | Picking | Siparise gore urunleri raftan alma |
+| Paketleme | Packing | Toplanan urunleri paketleme |
+| Sevkiyat | Shipping | Depodan cikis ve yukleme |
+| Konum | Location/Bin | Raftaki fiziksel adres (A-01-02-03) |
+| SKU | SKU (Stock Keeping Unit) | Urun tanimlayici |
+| Lot | Lot/Batch | Uretim partisi |
+| FIFO | First In First Out | Ilk giren ilk cikar |
+| FEFO | First Expired First Out | Ilk biten ilk cikar (gida/ilac) |
+| Dalga | Wave | Toplu siparis gruplama |
+| Gorev | Task | Operatorun yapacagi is birimi |
+| Slotting | Slotting | Urun konum optimizasyonu |
+| Cycle Count | Cycle Count | Periyodik sayim |
+| ASN | Advanced Shipping Notice | On sevkiyat bildirimi |
+| BOL | Bill of Lading | Tasima belgesi |
+| Crossdock | Cross-docking | Direkt sevkiyat (depolama yok) |
+| Catch Weight | Catch Weight | Degisken agirlikli urun |
+| Kitting | Kitting/VAS | Urun birlestirme/katma deger servisi |
+
+## Core Entity'ler
+| Entity | Aciklama | Temel Propertyler |
+|--------|----------|-------------------|
+| Warehouse | Depo tesisi | Name, Code, Address, Type, TimeZone |
+| Zone | Depo bolgesi (bulk, pick, staging) | Name, Type, WarehouseId, Temperature |
+| Location | Raf konumu | Code (A-01-02-03), ZoneId, Type, Capacity, CurrentWeight |
+| Product | Urun master verisi | SKU, Name, UOM, Weight, Dimensions, BarcodeList |
+| InventoryItem | Stok kaydi | ProductId, LocationId, Quantity, LotNumber, ExpiryDate, Status |
+| InboundOrder | Mal kabul siparisi | ASN#, SupplierId, ExpectedDate, Status, Lines[] |
+| OutboundOrder | Sevkiyat siparisi | OrderNumber, CustomerId, Priority, Status, Lines[] |
+| Wave | Dalga (toplu toplama) | WaveNumber, Orders[], Status, PickStrategy |
+| Task | Operator gorevi | Type, AssignedTo, FromLocation, ToLocation, ProductId, Qty, Status |
+| StockMovement | Stok hareketi | Type(IN/OUT/TRANSFER), ProductId, Qty, FromLoc, ToLoc, Timestamp |
+| CycleCount | Sayim gorevi | LocationId, ExpectedQty, CountedQty, Variance, Status |
+
+## Kullanici Rolleri
+| Rol | Aciklama | Temel Yetkiler |
+|-----|----------|----------------|
+| Warehouse Manager | Depo muduru | Tam yetki, raporlar, config |
+| Supervisor | Vardiya amiri | Gorev atama, dalga yonetimi, onay |
+| Receiving Clerk | Mal kabul operatoru | Inbound order, putaway |
+| Picker | Toplayici | Pick gorevi, barkod tarama |
+| Packer | Paketleyici | Packing, label basimi |
+| Shipping Clerk | Sevkiyat operatoru | Yukleme, BOL, carrier atama |
+| Inventory Controller | Stok kontrol | Cycle count, adjustment, reporting |
+| Yard Manager | Saha yoneticisi | Dock, trailer, yard hareketi |
+
+## Is Kurallari
+
+### Stok Yonetimi
+- Her stok hareketi `StockMovement` kaydı olusturur (audit trail)
+- Negatif stok YASAK (exception: adjustment with approval)
+- Lot tracking: gida/ilac icin ZORUNLU (FEFO)
+- Serial tracking: yuksek degerli urunler icin
+- Stok durumu: Available, Reserved, Damaged, Quarantine, InTransit
+
+### FIFO/FEFO Kurali
+```
+Picking sirasinda urun secimi:
+├── Gida/ilac? -> FEFO (ExpiryDate ASC, en yakin tarih once)
+├── Normal urun? -> FIFO (ReceivedDate ASC, en eski once)
+├── Ozel kural? -> Customer-specific (lot preference)
+└── Ayni tarih? -> Location proximity (en yakin konum)
+```
+
+### Konum Adresleme (Location Code)
+```
+Format: {Zone}-{Aisle}-{Rack}-{Level}
+Ornek: A-01-02-03 = Zone A, Koridor 1, Raf 2, Seviye 3
+       RECV-STAGE-01 = Receiving staging alani 1
+       SHIP-DOCK-03 = Shipping dock 3
+```
+
+## Status Akislari
+
+### Inbound Order Lifecycle
+```
+Draft -> Confirmed -> Arrived -> Receiving -> Quality Check
+   -> Putaway -> Completed
+   -> Partially Received (kismi kabul)
+   -> Rejected (kalite red)
+```
+
+### Outbound Order Lifecycle
+```
+Draft -> Confirmed -> Wave Assigned -> Picking -> Picked
+   -> Packing -> Packed -> Loading -> Shipped -> Delivered
+   -> Short Pick (eksik toplama)
+   -> Cancelled
+```
+
+### Task Lifecycle
+```
+Created -> Assigned -> InProgress -> Completed
+   -> Paused (mola, oncelik degisimi)
+   -> Cancelled
+   -> Failed (sorun bildirimi)
+```
+
+## KPI'lar
+| KPI | Formul | Hedef |
+|-----|--------|-------|
+| Order Accuracy | Hatasiz siparis / Toplam siparis | > %99.5 |
+| On-Time Shipment | Zamaninda sevk / Toplam sevk | > %98 |
+| Inventory Accuracy | Sayim dogru konum / Toplam konum | > %99 |
+| Putaway Time | Ort. yerlestirme suresi | < 15 dk |
+| Pick Rate | Urun/saat/operator | > 100 |
+| Dock-to-Stock | Mal kabul -> raf suresi | < 4 saat |
+| Space Utilization | Kullanilan alan / Toplam alan | > %85 |
+| Damage Rate | Hasarli urun / Toplam urun | < %0.5 |

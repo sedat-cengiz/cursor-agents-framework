@@ -1,0 +1,177 @@
+---
+description: "Tum agentlar icin gecerli ortak konvansiyonlar, API standartlari, guvenlik, loglama ve iletisim protokolu — teknoloji bagimsiz"
+globs: 
+alwaysApply: true
+priority: 10
+---
+
+# Global Conventions — Ortak Kurallar
+
+## Agent Odakli Calisma
+- Yeni ozellik ve **hata duzeltmeleri** ilgili agent'a atanir ve **agent tarafindan** yapilir.
+- Duzeltme sonrasi agent ogrenmeyi `docs/agents/lessons-learned.md` ve gerekirse kurallara yazar.
+- Detay: `docs/agents/AGENT-DRIVEN-WORKFLOW.md`.
+
+## Genel vs Proje Ozelinde
+- **Genel agent kurallari:** Teknoloji bagimsiz core kurallar + teknoloji paketleri; proje sabiti icermez.
+- **Domain / proje bilgisi:** Proje klasorunde — `docs/agents/` (proje-sabitleri.md, taskboard, ADR, requirements).
+- Tech kurallarina proje sabiti yazma; sabitler `docs/agents/proje-sabitleri.md` olsun.
+
+---
+
+## Proje Bilgileri
+
+> Proje kurulumunda doldurulacak — manifest dosyasindan veya kullanici tarafindan.
+
+- **Proje Adi:** {{PROJE_ADI}}
+- **Platform:** {{PLATFORM_TANIMI}}
+- **Mimari Felsefe:** "Simple things should be simple, complex things should be possible." — Alan Kay
+
+## Teknoloji Stack
+
+> Asagidaki bolum proje manifestinden (orn. `manifest.yaml`) otomatik doldurulur.
+> Teknoloji detaylari icin ilgili tech-pack `.mdc` dosyalarina bak.
+
+{{TECHNOLOGY_STACK}}
+
+---
+
+## Dil Kurallari
+
+| Alan | Dil | Not |
+|------|-----|-----|
+| Kullanici ile iletisim | **{{ILETISIM_DILI}}** | Manifest'ten; varsayilan: Turkce |
+| Kod (degisken, metod, class) | **Ingilizce** | Her zaman |
+| Kod yorumlari | **Ingilizce** | Sadece "why" acikla — "what" kodu kendisi soylesin |
+| Commit mesajlari | **Ingilizce** | Conventional commits: `feat/fix/refactor/test/docs` |
+| Dokumantasyon (docs/) | **{{DOKUMAN_DILI}}** | Manifest'ten; varsayilan: Turkce |
+| UI metinleri | **i18n** | ASLA hardcoded string kullanma |
+
+## Naming Conventions
+
+> Teknolojiye ozel naming convention'lar ilgili tech-pack `.mdc` dosyasinda tanimlanir.
+> Asagidakiler tum teknolojiler icin gecerli **genel** kurallardir.
+
+- **API Endpoints:** kebab-case plural (`/api/v1/order-items`)
+- **API Query Params:** camelCase (`pageSize`, `sortBy`)
+- **Environment Variables:** UPPER_SNAKE_CASE (`API_BASE_URL`, `DB_CONNECTION`)
+- **Feature Flags:** PascalCase + Enabled suffix (`TwoFactorEnabled`)
+- **DB Tables:** PascalCase plural (`Orders`, `OrderItems`)
+- **DB Columns:** PascalCase (`CreatedAt`, `TenantId`)
+
+---
+
+## API Standartlari
+- RESTful: GET, POST, PUT, DELETE, PATCH
+- Versiyonlama: `/api/v1/...` (URL-based)
+- Response: `Result<T>` wrapper (`IsSuccess`, `Message`, `Data`, `Errors`)
+- Pagination: `PagedResult<T>` (`Items`, `TotalCount`, `Page`, `PageSize`)
+- Sorting: `?sort=createdAt:desc` veya `?sort=status:asc,createdAt:desc`
+- Filtering: `?filters[status]=active&filters[categoryId]=xxx`
+- ProblemDetails (RFC 7807) for errors
+- Headers: `X-Correlation-Id`, `X-Request-Duration-Ms`, `X-RateLimit-*`
+
+### HTTP Status Codes
+```
+200 OK          -> GET, PUT, PATCH
+201 Created     -> POST (Location header ile)
+204 No Content  -> DELETE
+400 Bad Request -> Validation hatasi
+401 Unauthorized -> Token yok/gecersiz
+403 Forbidden   -> Yetki yok
+404 Not Found   -> Entity bulunamadi
+409 Conflict    -> Duplicate / Concurrency
+422 Unprocessable -> Is kurali ihlali
+429 Too Many    -> Rate limit (Retry-After header)
+500 Internal    -> Beklenmeyen hata (ASLA detay gosterme)
+```
+
+---
+
+## Exception / Hata Yonetimi Ilkeleri
+
+> Teknolojiye ozel exception hiyerarsisi tech-pack'te tanimlanir. Asagidakiler genel ilkelerdir.
+
+- ASLA generic exception catch etme — spesifik hata turlerini yakala.
+- ASLA exception'i yut (swallow) — logla veya rethrow.
+- Hata kategorileri: Domain (is kurali), Validation, Authorization, Infrastructure (DB/cache/dis servis), Beklenmeyen.
+- Her beklenmeyen hata: 500 + loglama + correlationId.
+
+---
+
+## Performans Hedefleri
+- API Response (CRUD): < 200ms (P50), < 500ms (P95)
+- API Response (List): < 300ms (P50), < 800ms (P95)
+- DB Query: < 100ms (P95)
+- Cache Hit: < 5ms
+- Frontend FCP: < 2.5s
+- Frontend Bundle: < 500KB gzip
+
+---
+
+## Logging Standartlari
+- **Structured logging** kullan — ASLA string interpolation/concatenation ile log uretme.
+- Dogru: `logger.info("Order {orderId} created by {userId}", orderId, userId)`
+- Her log entry: Timestamp, Level, Message, TenantId, UserId, CorrelationId
+- **ASLA loglanmayacak:** Password, token, credit card, kimlik numarasi, connection string, API key
+
+---
+
+## Guvenlik Temel Kurallari
+- Tum input: whitelist validation (server-side zorunlu, client-side tek basina yeterli degil)
+- Tum output: encode/escape (XSS korunmasi)
+- Her endpoint: authentication + authorization kontrolu
+- ASLA raw SQL/query string birlestirmesi — parametreli sorgu kullan
+- ASLA kod icinde secret — environment variable veya secret manager kullan
+- Her sprint: dependency vulnerability taramasi (`npm audit`, paket guvenlik kontrolu vb.)
+
+---
+
+## Agent Iletisim Protokolu
+
+### Gorev Alirken
+1. `docs/agents/taskboard.md` oku — hangi gorev, hangi sprint
+2. `docs/agents/workflow-state.md` oku — akisin hangi adiminda
+3. Ilgili `requirements/`, `contracts/`, `decisions/`, `handoffs/` dosyalarini oku
+4. **Mevcut kodu oku** — tekrar yazma, uzerine ekle
+5. `docs/agents/lessons-learned.md` oku — ayni hatayi tekrarlama
+
+### Is Bitirirken
+1. Linter hatalarini duzelt — sifir hata ile birak
+2. Testleri yaz veya guncelle — test olmadan is tamamlanmis sayilmaz
+3. `docs/agents/taskboard.md` guncelle (durum, tarih)
+4. Gerekiyorsa handoff notu birak
+5. Onemli karar gerekiyorsa **KULLANICIYA SOR** — tahmin etme
+
+### Handoff Notu Formati
+```markdown
+# Handoff: [Kaynak Agent] -> [Hedef Agent]
+**Tarih:** YYYY-MM-DD
+
+## Tamamlanan Is
+- [Yapilan isler listesi]
+
+## API / Kontrat Degisiklikleri
+- [Eklenen/degisen endpoint, DTO, event vb.]
+
+## Sonraki Adim
+- [Hedef agent'in yapacaklari]
+
+## Dikkat Edilmesi Gerekenler
+- [Bilinen kisitlar, riskler, varsayimlar]
+```
+
+---
+
+## Altin Kurallar
+
+1. Her onemli kararda **KULLANICIDAN ONAY** iste
+2. Emin olmadigin durumlarda **SOR** — tahmin etme
+3. Mevcut calisan kodu kirma — **backward compatibility**
+4. Her degisiklik icin **neden** belirt
+5. Buyuk degisiklikleri **kucuk adimlara** bol
+6. **Test yazilmadan** kod tamamlanmis sayilmaz
+7. Gereksiz abstraction ekleme — **YAGNI**
+8. **DRY** — ama zorlama abstraction degil
+9. **Okunabilirligi** optimize et — clever code degil, clear code
+10. **Guvenlik** ilk gunden itibaren — sonradan eklenmez

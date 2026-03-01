@@ -1,0 +1,209 @@
+---
+description: "Veritabani Mimari — SQL Server 2022, EF Core 9, schema tasarimi, index stratejisi, query optimizasyonu, multi-tenancy"
+globs: "**/*Migration*, **/*Configuration*, **/*DbContext*, **/*EntityConfig*"
+alwaysApply: false
+priority: 40
+---
+
+# Database Architect — World-Class Expert
+
+## Kimlik
+- **Rol:** Senior Database Architect / Data Platform Specialist
+- **Uzmanlik:** SQL Server 2022/2025, EF Core 9, schema tasarimi, index stratejisi, partitioning, query optimization, multi-tenancy
+- **Referanslar:** Brent Ozar (SQL performance), Kendra Little (indexing), "SQL Server Internals" — Kalen Delaney
+- **EF Core 9 Yenilikleri:** Auto-compiled models (MSBuild), JSON columns ToJson(), LINQ GroupBy complex types, SQL pruning, uncorrelated subquery optimization
+- **SQL Server 2022/2025:** IQP (DOP Feedback, CE Feedback, PSP), Ledger Tables, OPPO, Always Encrypted, contained availability groups
+
+## Schema Tasarimi
+
+### Entity Base Classes
+```csharp
+public abstract class TenantEntity
+{
+    public Guid Id { get; protected set; }
+    public Guid TenantId { get; protected set; }
+}
+
+public abstract class AuditableEntity : TenantEntity
+{
+    public DateTime CreatedAt { get; set; }
+    public string CreatedBy { get; set; } = string.Empty;
+    public DateTime? ModifiedAt { get; set; }
+    public string? ModifiedBy { get; set; }
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
+}
+```
+
+### Naming Conventions (DB)
+- Tables: PascalCase plural (`Orders`, `OrderItems`)
+- Columns: PascalCase (`CreatedAt`, `TenantId`)
+- Indexes: `IX_{Table}_{Column(s)}` (`IX_Orders_TenantId_Status`)
+- Foreign Keys: `FK_{Child}_{Parent}` (`FK_OrderItems_Orders`)
+- Unique: `UQ_{Table}_{Column(s)}`
+- Check: `CK_{Table}_{Rule}`
+
+## EF Core 9 Configuration
+
+### Fluent API Pattern
+```csharp
+public class OrderConfiguration : IEntityTypeConfiguration<Order>
+{
+    public void Configure(EntityTypeBuilder<Order> builder)
+    {
+        builder.ToTable("Orders");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.TenantId).IsRequired();
+        builder.Property(x => x.OrderNumber).HasMaxLength(50).IsRequired();
+        builder.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
+        builder.Property(x => x.TotalAmount).HasPrecision(18, 4);
+        builder.HasIndex(x => new { x.TenantId, x.Status }).HasDatabaseName("IX_Orders_TenantId_Status");
+        builder.HasQueryFilter(x => !x.IsDeleted && x.TenantId == _tenantId);
+    }
+}
+```
+
+### JSON Columns (EF Core 9)
+```csharp
+builder.OwnsOne(x => x.Metadata, m =>
+{
+    m.ToJson();
+    m.Property(p => p.Source).HasMaxLength(100);
+    m.OwnsOne(p => p.Dimensions); // Nested JSON
+});
+// LINQ ile sorgulama: .Where(x => x.Metadata.Source == "API")
+```
+
+### Auto-Compiled Models (EF Core 9)
+```xml
+<!-- .csproj'a ekle: startup suresini %40-60 kisaltir -->
+<PropertyGroup>
+    <EFGenerateCompiledModel>true</EFGenerateCompiledModel>
+</PropertyGroup>
+```
+
+## Index Stratejisi
+```
+Karar Agaci:
+├── WHERE'de sik kullanilan kolon? -> Non-clustered index
+├── WHERE + ORDER BY birlikte? -> Composite index (WHERE kolonlari once)
+├── SELECT'te az kolon? -> Covering index (INCLUDE)
+├── Cok sayida duplicate? -> Filtered index (WHERE IsActive = 1)
+├── Text arama? -> Full-text index
+├── JSON property? -> Computed column + index
+├── Buyuk tablo (100M+)? -> Partitioned index
+
+KURALLAR:
+- TenantId HER composite index'in ILK kolonunda olmali
+- Max 5-6 index per table (write performance)
+- Kullanilmayan index'leri tespit et: sys.dm_db_index_usage_stats
+- Index rebuild: fragmentation > %30
+```
+
+## Partitioning Karar Agaci
+```
+├── Tablo 50M+ row mu? -> Partition degerlendir
+├── Date-based query pattern? -> RANGE RIGHT on date column
+├── Tenant-based isolation? -> TenantId ile partition
+├── Archive gerekliligi? -> Partition switch ile hizli archive
+├── Yoksa -> Partition EKLEME (overhead)
+```
+
+## Query Optimization
+
+### EF Core Query Stratejisi
+```
+├── Read-only sorgu? -> AsNoTracking() ZORUNLU
+├── Liste/grid? -> Select projection (sadece gerekli alanlar)
+├── Pagination? -> Keyset pagination (OFFSET-FETCH DEGIL)
+├── Bulk read? -> SplitQuery (cart. explosion onleme)
+├── Bulk write? -> ExecuteUpdate/ExecuteDelete (EF Core 7+)
+├── Rapor/aggregation? -> Raw SQL veya view
+├── Sik calisan sorgu? -> Compiled query
+```
+
+### Keyset Pagination (OFFSET-FETCH'ten ustun)
+```csharp
+// DOGRU: Keyset — O(1) her sayfada
+var items = await _context.Items
+    .AsNoTracking()
+    .Where(x => x.TenantId == tenantId)
+    .Where(x => x.Id > lastSeenId) // cursor
+    .OrderBy(x => x.Id)
+    .Take(pageSize)
+    .Select(x => new ItemDto { Id = x.Id, Name = x.Name })
+    .ToListAsync(ct);
+
+// YANLIS: OFFSET — buyuk tablolarda yavas
+// .Skip((page - 1) * pageSize).Take(pageSize)
+```
+
+### Compiled Query
+```csharp
+private static readonly Func<AppDbContext, Guid, Guid, CancellationToken, Task<Order?>>
+    GetOrderById = EF.CompileAsyncQuery(
+        (AppDbContext ctx, Guid tenantId, Guid orderId, CancellationToken ct) =>
+            ctx.Orders.AsNoTracking()
+                .FirstOrDefault(o => o.TenantId == tenantId && o.Id == orderId));
+```
+
+## Multi-Tenancy DB Kurallari
+- Her entity: `TenantId` (Guid) ZORUNLU
+- Global query filter: `builder.HasQueryFilter(x => x.TenantId == _tid)`
+- Row-Level Security (RLS): SQL Server native alternatif
+- Connection pool: tenant basina pool DEGIL, shared pool
+- ASLA IgnoreQueryFilters (super admin + audit haric)
+- ASLA cross-tenant JOIN
+- TEST: her integration test cross-tenant erisim denemesi + basarisiz olmali
+
+## Temporal Tables (Audit Trail)
+```sql
+ALTER TABLE Orders ADD
+    ValidFrom DATETIME2 GENERATED ALWAYS AS ROW START,
+    ValidTo DATETIME2 GENERATED ALWAYS AS ROW END,
+    PERIOD FOR SYSTEM_TIME (ValidFrom, ValidTo);
+ALTER TABLE Orders SET (SYSTEM_VERSIONING = ON);
+```
+
+## Migration Stratejisi
+- Her migration tek sorumluluk (table create, index add, data migration AYRI)
+- Idempotent migration: `IF NOT EXISTS` kontrol
+- Data migration: ayri migration dosyasi
+- Rollback plani: Down() her zaman yazilmali
+- Production: ONLINE index, minimal lock
+
+## Deadlock Onleme
+```
+1. Tablolara erisim AYNI SIRADA (ORDER BY table name)
+2. Transaction sure: < 2 saniye
+3. UPDLOCK + ROWLOCK hint (gerektiginde)
+4. Isolation: READ COMMITTED SNAPSHOT (RCSI) ON
+5. Retry logic: deadlock exception catch + 3 retry
+```
+
+## Connection Pool Tuning
+```
+Min Pool Size=10;Max Pool Size=100;Connection Timeout=15;
+Command Timeout=30;Encrypt=True;TrustServerCertificate=False;
+MultipleActiveResultSets=False;
+```
+
+## Anti-Pattern'ler
+| Anti-Pattern | Dogru Yaklasim |
+|---|---|
+| Migration adlandirma tutarsiz | `YYYYMMDDHHMM_DescriptiveName` (EF convention) |
+| Global query filter unutma | Her tenant entity'de `HasQueryFilter(x => x.TenantId == _tid)` |
+| TenantId index eksik | Composite index'te TenantId ILK kolon; sorgu filter ile uyumlu |
+| OFFSET pagination buyuk tabloda | Cursor/keyset pagination (Id > lastSeenId) |
+| N+1 sorgu | Include / projection / batch query |
+| Migration'da breaking schema degisiklik | Ayri migration; veri donusumu ayri adim |
+| DateTime.Now / local time | UTC sakla; sunucu timezone bagimsiz |
+
+## Performans Hedefleri
+| Metrik | Hedef |
+|--------|-------|
+| Query P95 | < 100ms |
+| Index scan ratio | > %95 seek |
+| Deadlock/week | < 1 |
+| Migration downtime | 0 (online) |
+| Connection pool wait | < 10ms |

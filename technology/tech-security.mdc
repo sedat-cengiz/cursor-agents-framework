@@ -1,0 +1,206 @@
+---
+description: "Guvenlik Uzmani — OWASP 2025, JWT, OAuth 2.0, Zero Trust, API security, supply chain, compliance"
+globs: "**/Auth/**, **/Middleware/**, **/Security/**, **/Identity/**"
+alwaysApply: false
+priority: 100
+---
+
+# Security Specialist — World-Class Expert
+
+## Kimlik
+- **Rol:** Principal Security Engineer / AppSec Specialist
+- **Uzmanlik:** OWASP ASVS v4, OWASP Top 10 2025, OWASP API Security, JWT/OAuth 2.0, Zero Trust, Threat Modeling, KVKK/GDPR, Supply Chain Security
+- **Referanslar:** OWASP Foundation, "The Web Application Hacker's Handbook", NIST Cybersecurity Framework, CIS Benchmarks
+- **OWASP 2025 Yenilikleri:** A03 Software Supply Chain Failures (#1 community), A10 Mishandling of Exceptional Conditions (yeni)
+
+## OWASP Top 10: 2025 (Guncel)
+```
+A01: Broken Access Control
+A02: Cryptographic Failures
+A03: Software Supply Chain Failures (NEW - #1 community survey)
+A04: Server-Side Request Forgery (SSRF)
+A05: Security Misconfiguration
+A06: Insecure Design
+A07: Authentication Failures
+A08: Software and Data Integrity Failures
+A09: Security Logging and Alerting Failures
+A10: Mishandling of Exceptional Conditions (NEW)
+```
+
+## Authentication & Authorization
+
+### JWT Security
+```csharp
+services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new()
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ClockSkew = TimeSpan.Zero, // ASLA default 5dk tolerans
+            ValidIssuer = config["Jwt:Issuer"],
+            ValidAudience = config["Jwt:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(key)
+        };
+    });
+```
+
+### JWT Token Standartlari
+- Access Token: 15 dk (kisa omur)
+- Refresh Token: 7 gun (secure, httpOnly cookie)
+- Refresh Rotation: her kullanilda yeni token + eski iptal
+- Claims: UserId, TenantId, Roles, Permissions (minimal)
+- ASLA hassas veri JWT'ye koyma (sifre, kredi kart, TC)
+
+### JWT Attack Vektorleri
+| Saldiri | Onlem |
+|---------|-------|
+| Algorithm confusion (none/HS256) | ValidAlgorithms = ["RS256"] |
+| Token theft (XSS) | HttpOnly + Secure + SameSite cookie |
+| Brute force signing key | Min 256-bit key, key rotation |
+| Token replay | jti claim + kisa omur |
+| Privilege escalation | Server-side role check, ASLA client trust |
+
+### 2FA (TOTP — RFC 6238)
+- Uygulama: Google Authenticator / Microsoft Authenticator
+- Backup codes: 10 adet, tek kullanimlik, bcrypt hash ile sakla
+- Zorunluluk: Admin + yuksek yetkili kullanicilar icin ZORUNLU
+- Rate limit: 5 hatali deneme -> 15 dk kilit
+
+### Password Policy
+```
+MinLength: 12 karakter
+Karmasiklik: Buyuk + kucuk + rakam + ozel karakter
+Hash: BCrypt (cost factor: 12)
+Gecmis kontrol: Son 5 sifre tekrar YASAK
+HaveIBeenPwned: API ile bilinen sifreler YASAK
+Degisim: 90 gunde bir (zorunlu degil, NIST 800-63B)
+```
+
+## OWASP API Security Top 10
+```
+API1: Broken Object Level Authorization (BOLA)
+  -> Her endpoint'te object ownership kontrol et
+API2: Broken Authentication
+  -> Rate limit + account lockout + 2FA
+API3: Broken Object Property Level Authorization
+  -> DTO ile sadece izinli field'lari expose et
+API4: Unrestricted Resource Consumption
+  -> Rate limit + pagination limit + file size limit
+API5: Broken Function Level Authorization
+  -> [RequirePermission] attribute + RBAC
+API6: Unrestricted Access to Sensitive Business Flows
+  -> CAPTCHA + device fingerprint + bot detection
+API7: Server Side Request Forgery
+  -> URL whitelist + internal network block
+API8: Security Misconfiguration
+  -> Security headers + CORS strict + debug off
+API9: Improper Inventory Management
+  -> API versioning + deprecation policy + docs
+API10: Unsafe Consumption of APIs
+  -> Input validation on 3rd party responses
+```
+
+## Security Headers (ZORUNLU)
+```csharp
+app.Use(async (ctx, next) =>
+{
+    ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    ctx.Response.Headers["X-Frame-Options"] = "DENY";
+    ctx.Response.Headers["X-XSS-Protection"] = "0"; // modern browsers don't need
+    ctx.Response.Headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
+    ctx.Response.Headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'";
+    ctx.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    ctx.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+    await next();
+});
+```
+
+## Rate Limiting
+```csharp
+services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("general", opt =>
+    {
+        opt.PermitLimit = 100;
+        opt.Window = TimeSpan.FromMinutes(1);
+    });
+    options.AddFixedWindowLimiter("auth", opt =>
+    {
+        opt.PermitLimit = 5;
+        opt.Window = TimeSpan.FromMinutes(15);
+    });
+    options.RejectionStatusCode = 429;
+});
+```
+
+## Threat Modeling (STRIDE)
+```
+S - Spoofing     -> Authentication (JWT, 2FA)
+T - Tampering    -> Integrity (HMAC, digital signature, audit log)
+R - Repudiation  -> Non-repudiation (audit trail, temporal tables)
+I - Info Disclosure -> Confidentiality (encryption, TLS, data masking)
+D - Denial of Service -> Availability (rate limiting, circuit breaker)
+E - Elevation of Privilege -> Authorization (RBAC, least privilege)
+```
+
+## Supply Chain Security (A03:2025)
+```
+Onlemler:
+├── SBOM (Software Bill of Materials) olustur
+├── `dotnet list package --vulnerable` her CI'da
+├── `npm audit` her CI'da
+├── Dependency pinning (lock files commit)
+├── Private registry (NuGet, npm) kullan
+├── Dependabot / Renovate otomatik PR
+├── Signature verification (NuGet signed packages)
+└── Container image scanning (Trivy)
+```
+
+## Data Protection
+- TLS 1.3 transit encryption (ZORUNLU)
+- SQL Server TDE (Transparent Data Encryption) at rest
+- Field-level encryption: AES-256-GCM (PII: TC, telefon, adres)
+- Key management: Azure Key Vault / HashiCorp Vault
+- KVKK/GDPR: data retention policy, right to erasure, consent tracking
+
+## Audit Logging
+```csharp
+public class SecurityAuditLog
+{
+    public Guid Id { get; set; }
+    public DateTime Timestamp { get; set; }
+    public string EventType { get; set; }  // LOGIN, LOGOUT, ACCESS_DENIED, DATA_EXPORT
+    public Guid? UserId { get; set; }
+    public Guid? TenantId { get; set; }
+    public string IpAddress { get; set; }
+    public string UserAgent { get; set; }
+    public string Resource { get; set; }
+    public string Action { get; set; }
+    public bool Success { get; set; }
+    public string? FailureReason { get; set; }
+}
+```
+
+## Incident Response Plan
+```
+1. DETECT: Anomaly tespit (log alert, WAF, monitoring)
+2. CONTAIN: Etkilenen hesaplari/servisleri izole et
+3. ERADICATE: Root cause bul, vulnerability patch
+4. RECOVER: Servisleri geri yukle, data integrity kontrol
+5. LESSONS: Post-mortem yaz, kuralları guncelle
+```
+
+## Anti-Pattern'ler
+| Anti-Pattern | Dogru Yaklasim |
+|---|---|
+| Hardcoded secret | Environment variable / Key Vault |
+| JWT'de hassas veri | Minimal claims |
+| CORS: `*` | Explicit origin whitelist |
+| `catch(Exception) {}` | Log + alert |
+| Rate limit yok | Endpoint bazli rate limit |
+| SQL string concat | Parameterized query |
+| `ClockSkew = 5 min` | `ClockSkew = TimeSpan.Zero` |

@@ -1,0 +1,146 @@
+---
+description: "E-Commerce Domain — E-ticaret kavramlari, entity'ler, roller, is kurallari, terminoloji"
+globs: 
+alwaysApply: false
+priority: 60
+---
+
+# Domain: E-Commerce (E-Ticaret)
+
+## Domain Tanimi
+Online urun/hizmet satisi platformu. Urun katalog yonetimi, sepet, siparis, odeme, kargo, iade ve musteri yonetimi ana surecleri icerir.
+
+## Terimler Sozlugu
+| Terim (TR) | English | Tanim |
+|------------|---------|-------|
+| Urun | Product | Satisa sunulan kalem |
+| Varyant | Variant | Urunun renk/beden/boyut secenegi |
+| SKU | SKU | Benzersiz stok birimi |
+| Sepet | Cart | Kullanicinin satin alma listesi |
+| Siparis | Order | Onaylanan satis islemi |
+| Odeme | Payment | Para transferi islemi |
+| Kargo | Shipment | Urunun musteriye gonderimi |
+| Iade | Return/Refund | Urun geri iade sureci |
+| Kupon | Coupon | Indirim kodu |
+| Kampanya | Campaign/Promotion | Toplu indirim/firsatlar |
+| Favori | Wishlist | Kullanicinin istekler listesi |
+| Degerlendirme | Review/Rating | Urun yorumu ve puanlama |
+| Kategori | Category | Urun siniflandirmasi |
+| Marka | Brand | Uretici/marka |
+| Stok | Inventory/Stock | Mevcut urun miktari |
+| Adres | Address | Teslimat/fatura adresi |
+| Abonelik | Subscription | Tekrarlayan siparis |
+
+## Core Entity'ler
+| Entity | Aciklama | Temel Propertyler |
+|--------|----------|-------------------|
+| Product | Urun master | Name, Description, Brand, Category, Images[], SEO |
+| Variant | Urun varyanti | SKU, Price, Stock, Attributes (color, size), Weight |
+| Category | Urun kategorisi | Name, ParentId, Slug, Image, IsActive |
+| Cart | Sepet | UserId, Items[], TotalAmount, CouponCode |
+| CartItem | Sepet kalemi | VariantId, Quantity, UnitPrice |
+| Order | Siparis | OrderNumber, CustomerId, Status, Items[], Totals |
+| OrderItem | Siparis kalemi | VariantId, Qty, UnitPrice, Discount, Tax |
+| Payment | Odeme | OrderId, Method, Amount, Status, TransactionId |
+| Shipment | Kargo | OrderId, CarrierId, TrackingNo, Status |
+| Return | Iade | OrderId, Items[], Reason, Status, RefundAmount |
+| Customer | Musteri | Name, Email, Phone, Addresses[], OrderHistory |
+| Address | Adres | Type (billing/shipping), City, District, Line1, Zip |
+| Coupon | Kupon | Code, Type (percent/fixed), Value, MinOrder, ExpiryDate |
+| Campaign | Kampanya | Name, Type, Rules[], StartDate, EndDate |
+| Review | Degerlendirme | ProductId, UserId, Rating (1-5), Comment, Images[] |
+| Wishlist | Favori listesi | UserId, ProductIds[] |
+
+## Kullanici Rolleri
+| Rol | Aciklama | Temel Yetkiler |
+|-----|----------|----------------|
+| Customer | Musteri | Satin alma, iade, profil yonetimi |
+| Seller | Satici (marketplace) | Urun ekleme, siparis yonetimi |
+| Admin | Platform yoneticisi | Tam yetki |
+| Content Editor | Icerik yoneticisi | Urun, kategori, banner |
+| CS Agent | Musteri hizmetleri | Siparis/iade islemleri |
+| Finance | Muhasebe | Odeme, iade, mutabakat raporlari |
+
+## Is Kurallari
+
+### Fiyat Hesaplama
+```
+Base Price (Variant.Price)
+  - Product Discount (urun indirimi)
+  - Campaign Discount (kampanya)
+  - Coupon Discount (kupon kodu)
+  = Net Price
+  + Tax (KDV: %1, %10, %20 — urun kategorisine gore)
+  + Shipping Fee
+  = Total Amount
+
+Kurallar:
+├── Indirimler urunun BASE price'i uzerinden hesaplanir
+├── Kampanya + kupon AYNI ANDA uygulanabilir (config'e bagli)
+├── Minimum siparis tutari kontrolu (kupon icin)
+├── Maximum indirim limiti (kupon icin)
+├── Negatif tutar OLMAZ — min 0.01 TL
+```
+
+### Stok Rezervasyonu
+```
+Sepete eklendi -> Soft reserve (15 dk, configurable)
+Odeme basladi -> Hard reserve (30 dk)
+Odeme basarili -> Committed (stoktan dus)
+Odeme basarisiz -> Release reserve
+Sepet timeout -> Release reserve
+
+KURAL: Stok gosterimi = Available - Reserved
+KURAL: Overselling YASAK (race condition icin distributed lock)
+```
+
+### Kupon Kurallari
+```
+├── Tip: Yuzde (%) veya sabit tutar (TL)
+├── Min siparis: kuponun gecerli olmasi icin min tutar
+├── Max indirim: yuzdelik kuponlarda tavan
+├── Kullanim limiti: toplam kullanim + kisi basi kullanim
+├── Gecerlilik: baslangic-bitis tarihi
+├── Urun/kategori kisitlamasi: sadece belirli urunlerde
+├── Ilk siparis kuponu: sadece yeni musteriler
+├── Combinable: baska kuponlarla birlesebilir mi?
+```
+
+## Status Akislari
+
+### Order Lifecycle
+```
+Draft -> PendingPayment -> Paid -> Processing -> Picking
+  -> Packed -> Shipped -> Delivered -> Completed
+  -> Cancelled (PendingPayment veya Paid'de mumkun)
+  -> PartiallyShipped (multi-parcel)
+  -> ReturnRequested -> ReturnReceived -> Refunded
+```
+
+### Payment Lifecycle
+```
+Initiated -> Processing -> Succeeded -> (Refunded)
+  -> Failed -> Retry (max 3)
+  -> Cancelled
+  -> PartialRefund
+```
+
+### Return Lifecycle
+```
+Requested -> Approved -> CargoLabelSent -> InTransit
+  -> Received -> Inspected -> Refunded
+  -> Rejected (sartlara uymayan)
+  -> PartialRefund (kismi iade)
+```
+
+## KPI'lar
+| KPI | Formul | Hedef |
+|-----|--------|-------|
+| Conversion Rate | Siparis / Ziyaretci | > %2-3 |
+| Cart Abandon Rate | Terk edilen / Toplam sepet | < %70 |
+| Average Order Value | Toplam gelir / Siparis sayisi | Artis trendi |
+| Customer Acquisition Cost | Pazarlama / Yeni musteri | Azalis trendi |
+| Customer Lifetime Value | Ort. siparis x Ort. siparis sayisi | Artis trendi |
+| Return Rate | Iade / Toplam siparis | < %10 |
+| Net Promoter Score | Promoter - Detractor | > 50 |
+| First Response Time | CS ilk yanit suresi | < 2 saat |

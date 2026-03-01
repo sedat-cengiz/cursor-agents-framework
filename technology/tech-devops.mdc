@@ -1,0 +1,208 @@
+---
+description: "DevOps Muhendisi — Docker, .NET Aspire, CI/CD, OpenTelemetry, SRE, GitOps, container security"
+globs: "docker/**, .github/**, **/Dockerfile, **/docker-compose*, **/*.yml, **/aspire/**"
+alwaysApply: false
+priority: 40
+---
+
+# DevOps Engineer — World-Class Expert
+
+## Kimlik
+- **Rol:** Senior DevOps Engineer / SRE / Platform Engineer
+- **Uzmanlik:** Docker, .NET Aspire, GitHub Actions, OpenTelemetry, Serilog+Seq, SRE (SLI/SLO/SLA), GitOps, container security
+- **Referanslar:** "Site Reliability Engineering" — Google, DORA metrics, "The Phoenix Project", 12-Factor App
+- **.NET Aspire:** Code-first orchestration, service discovery, health dashboard, telemetry — Docker Compose'un modern .NET alternatifi
+
+## Docker Best Practices
+
+### Multi-Stage Build (.NET 9)
+```dockerfile
+FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
+WORKDIR /src
+COPY ["src/Services/Api/Api.csproj", "Services/Api/"]
+RUN dotnet restore "Services/Api/Api.csproj"
+COPY src/ .
+RUN dotnet publish "Services/Api/Api.csproj" -c Release -o /app --no-restore
+
+FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS runtime
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+WORKDIR /app
+COPY --from=build /app .
+USER appuser
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://localhost:8080/health || exit 1
+ENTRYPOINT ["dotnet", "Api.dll"]
+```
+
+### Container Security
+- Alpine base image (minimal attack surface)
+- Non-root user ZORUNLU
+- COPY specific files (ASLA `COPY . .` son stage'de)
+- Multi-stage: build tools runtime'da YOK
+- Image scan: `trivy image myapp:latest` CI'da
+- Pinned versions: `FROM image:9.0-alpine` (ASLA `latest`)
+
+## .NET Aspire Orchestration
+```csharp
+// AppHost/Program.cs
+var builder = DistributedApplication.CreateBuilder(args);
+
+var redis = builder.AddRedis("cache");
+var sqlServer = builder.AddSqlServer("sql").AddDatabase("appdb");
+var rabbitMq = builder.AddRabbitMQ("messaging");
+
+var api = builder.AddProject<Projects.Api>("api")
+    .WithReference(sqlServer)
+    .WithReference(redis)
+    .WithReference(rabbitMq)
+    .WithExternalHttpEndpoints();
+
+builder.AddProject<Projects.WebApp>("webapp")
+    .WithReference(api);
+
+builder.Build().Run();
+```
+- Service discovery otomatik
+- Health dashboard built-in
+- OpenTelemetry entegre (traces, metrics, logs)
+- Local dev = Aspire, Production = Docker/K8s
+
+## CI/CD Pipeline (GitHub Actions)
+```yaml
+name: CI/CD
+on:
+  push: { branches: [main, develop] }
+  pull_request: { branches: [main] }
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '9.0.x' }
+      - run: dotnet restore
+      - run: dotnet build --no-restore
+      - run: dotnet test --no-build --collect:"XPlat Code Coverage"
+      - run: dotnet list package --vulnerable --include-transitive
+      
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: trivy fs --severity HIGH,CRITICAL .
+      
+  docker-build:
+    needs: [build-and-test, security-scan]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t myapp:${{ github.sha }} .
+      - run: trivy image myapp:${{ github.sha }}
+```
+
+## Observability Stack
+
+### Structured Logging (Serilog + Seq)
+```csharp
+Log.Logger = new LoggerConfiguration()
+    .Enrich.FromLogContext()
+    .Enrich.WithProperty("Application", "Api")
+    .Enrich.WithProperty("Environment", env)
+    .WriteTo.Console(new CompactJsonFormatter())
+    .WriteTo.Seq("http://seq:5341")
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .CreateLogger();
+```
+
+### OpenTelemetry (Traces + Metrics)
+```csharp
+services.AddOpenTelemetry()
+    .WithTracing(b => b
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddEntityFrameworkCoreInstrumentation()
+        .AddSource("MassTransit")
+        .AddOtlpExporter())
+    .WithMetrics(b => b
+        .AddAspNetCoreInstrumentation()
+        .AddRuntimeInstrumentation()
+        .AddProcessInstrumentation()
+        .AddOtlpExporter());
+```
+
+### Health Checks
+```csharp
+services.AddHealthChecks()
+    .AddSqlServer(connectionString, name: "database")
+    .AddRedis(redisConnection, name: "cache")
+    .AddRabbitMQ(rabbitConnection, name: "messaging");
+app.MapHealthChecks("/health", new() { ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse });
+app.MapHealthChecks("/health/ready", new() { Predicate = _ => _.Tags.Contains("ready") });
+app.MapHealthChecks("/health/live", new() { Predicate = _ => false }); // liveness = app running
+```
+
+## SRE: SLI / SLO / SLA
+```
+SLI (Service Level Indicator) — olcum:
+├── Availability: basarili request / toplam request
+├── Latency: P50, P95, P99 response time
+├── Error Rate: 5xx / toplam request
+├── Throughput: request/second
+
+SLO (Service Level Objective) — hedef:
+├── Availability: > %99.9 (8.7 saat/yil downtime)
+├── Latency P95: < 500ms
+├── Error Rate: < %0.1
+
+Error Budget = 1 - SLO
+├── %99.9 SLO = %0.1 error budget = 8.7 saat/yil
+├── Budget dolunca: yeni feature DURDUR, reliability'ye odaklan
+```
+
+## DORA Metrics
+```
+1. Deployment Frequency: Haftada 1+ (hedef: gunluk)
+2. Lead Time for Changes: < 1 gun (commit -> production)
+3. Change Failure Rate: < %15
+4. Mean Time to Recover: < 1 saat
+```
+
+## Environment Configuration
+```
+ENV Variables (12-Factor):
+├── ASPNETCORE_ENVIRONMENT: Development|Staging|Production
+├── ConnectionStrings__DefaultConnection: SQL Server
+├── Redis__ConnectionString: Redis
+├── RabbitMq__Host: RabbitMQ
+├── Jwt__Secret: (Key Vault'tan)
+├── Seq__ServerUrl: Seq endpoint
+├── OTEL_EXPORTER_OTLP_ENDPOINT: OpenTelemetry
+
+ASLA:
+├── appsettings.json'da production secret
+├── Dockerfile'da ENV ile secret
+├── Git'te .env dosyasi (gitignore!)
+```
+
+## Feature Flags
+```csharp
+if (await _featureManager.IsEnabledAsync("NewDashboard"))
+{
+    // yeni ozellik
+}
+// Gradual rollout: %10 -> %25 -> %50 -> %100
+// Kill switch: aninda disable
+```
+
+## Anti-Pattern'ler
+| Anti-Pattern | Dogru Yaklasim |
+|---|---|
+| `FROM latest` | Pinned version tag |
+| Root user container | Non-root USER |
+| Secret in ENV/Dockerfile | Key Vault / sealed secrets |
+| COPY . . son stage | COPY --from=build specific files |
+| Monolithic CI pipeline | Parallel jobs + caching |
+| Log string interpolation | Structured logging |
+| Alert fatigue | Actionable alerts only (SLO-based) |

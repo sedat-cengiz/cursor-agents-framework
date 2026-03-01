@@ -1,0 +1,67 @@
+---
+description: "Domain Pack Template — Yeni domain bilgisi eklemek icin bu sablonu kullan"
+globs: 
+alwaysApply: false
+priority: 60
+---
+
+# Domain: {{DOMAIN_ADI}}
+
+## Domain Tanimi
+[Bu domain ne hakkinda? Kisa ozet.]
+
+## Terimler Sozlugu
+| Terim (TR) | English | Tanim |
+|------------|---------|-------|
+| | | |
+
+## Core Entity'ler
+| Entity | Aciklama | Temel Propertyler |
+|--------|----------|-------------------|
+| | | |
+
+## Entity Iliskileri
+```
+[Entity A] 1---* [Entity B]
+[Entity B] *---1 [Entity C]
+```
+
+## Kullanici Rolleri
+| Rol | Aciklama | Temel Yetkiler |
+|-----|----------|----------------|
+| | | |
+
+## Is Kurallari
+### Kural 1: {Baslik}
+- **Aciklama:** [Ne]
+- **Kosul:** [Ne zaman]
+- **Sonuc:** [Ne olur]
+- **Istisna:** [Ne zaman gecersiz]
+
+## Status Akislari
+### {Entity} Status Lifecycle
+```
+status_a -> status_b -> status_c -> status_d
+                    \-> status_e (iptal/iade)
+```
+
+## KPI'lar
+| KPI | Formul | Hedef | Sıklık |
+|-----|--------|-------|--------|
+| | | | |
+
+## Entegrasyonlar
+| Sistem | Amac | Protokol |
+|--------|------|----------|
+| | | |
+
+## Domain Edge Cases
+1. [Ozel durum 1 — ne olur, nasil handle edilir]
+2. [Ozel durum 2]
+
+## Surec Akislari
+### Surec 1: {Baslik}
+```
+Adim 1 -> Adim 2 -> Karar? -> Evet: Adim 3a -> Son
+                            -> Hayir: Adim 3b -> Son
+```

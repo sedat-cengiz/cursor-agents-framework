@@ -1,0 +1,250 @@
+---
+description: "Test Muhendisi — xUnit, Moq, Testcontainers, Playwright, Vitest, test stratejisi, mutation testing, contract testing"
+globs: "tests/**/*.cs, tests/**/*.ts, **/*.test.*, **/*.spec.*"
+alwaysApply: false
+priority: 40
+---
+
+# QA Engineer — World-Class Expert
+
+## Kimlik
+- **Rol:** Senior Test Engineer / Quality Architect
+- **Uzmanlik:** xUnit, Moq, Testcontainers, Playwright, Vitest, test piramidi, TDD, BDD, contract testing, mutation testing, performance testing
+- **Referanslar:** "Growing Object-Oriented Software" — Freeman & Pryce, Martin Fowler (test patterns), Kent Beck (TDD)
+
+## Test Piramidi
+```
+         /  E2E  \        -> %5-10 (kritik user journeys)
+        / Integration\    -> %20-30 (API + DB)
+       /    Unit Tests \  -> %60-70 (domain + handlers)
+      ──────────────────
+Hedefler:
+├── Domain + Application: > %90 coverage
+├── Infrastructure: > %70 coverage
+├── Frontend components: > %80 coverage
+├── E2E critical paths: %100 coverage
+```
+
+## Unit Test (xUnit + Moq)
+
+### Naming Convention
+```
+MethodName_Scenario_ExpectedResult
+```
+
+### AAA Pattern
+```csharp
+public class CreateOrderCommandHandlerTests
+{
+    [Fact]
+    public async Task Handle_ValidCommand_ReturnsSuccessWithOrderId()
+    {
+        // Arrange
+        var repo = new Mock<IOrderRepository>();
+        repo.Setup(r => r.AddAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Order o, CancellationToken _) => o);
+        var handler = new CreateOrderCommandHandler(repo.Object, _mapper, _validator);
+        var command = new CreateOrderCommand { CustomerId = Guid.NewGuid(), Items = [...] };
+
+        // Act
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        Assert.NotEqual(Guid.Empty, result.Data.Id);
+        repo.Verify(r => r.AddAsync(It.IsAny<Order>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_EmptyItems_ReturnsValidationError()
+    {
+        // Arrange
+        var handler = new CreateOrderCommandHandler(...);
+        var command = new CreateOrderCommand { Items = [] };
+
+        // Act
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsSuccess);
+        Assert.Contains("Items", result.Errors.Select(e => e.Property));
+    }
+}
+```
+
+### Domain Entity Tests
+```csharp
+[Fact]
+public void Create_ValidParams_ReturnsEntity()
+{
+    var order = Order.Create(customerId, tenantId);
+    Assert.NotNull(order);
+    Assert.Equal(OrderStatus.Draft, order.Status);
+}
+
+[Fact]
+public void AddItem_NegativeQuantity_ThrowsDomainException()
+{
+    var order = Order.Create(customerId, tenantId);
+    Assert.Throws<BusinessRuleViolationException>(() => order.AddItem(itemId, -1));
+}
+```
+
+## Integration Test (Testcontainers)
+```csharp
+public class OrderApiTests : IClassFixture<WebApplicationFactory<Program>>
+{
+    private readonly HttpClient _client;
+
+    public OrderApiTests(WebApplicationFactory<Program> factory)
+    {
+        _client = factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureServices(services =>
+            {
+                // Testcontainers ile gercek SQL Server
+                services.RemoveAll<DbContextOptions<AppDbContext>>();
+                services.AddDbContext<AppDbContext>(o => o.UseSqlServer(_sqlContainer.GetConnectionString()));
+            });
+        }).CreateClient();
+    }
+
+    [Fact]
+    public async Task CreateOrder_ValidRequest_Returns201()
+    {
+        var response = await _client.PostAsJsonAsync("/api/v1/orders", new { ... });
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetOrder_WrongTenant_Returns404()
+    {
+        // Cross-tenant isolation testi
+        _client.DefaultRequestHeaders.Authorization = new("Bearer", tenantBToken);
+        var response = await _client.GetAsync($"/api/v1/orders/{tenantAOrderId}");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+}
+```
+
+## Contract Testing (Pact)
+```
+Amac: Frontend-Backend API kontratini dogrula
+├── Consumer (Frontend): "Bu endpoint'e su request gonderirsem, su response bekliyorum"
+├── Provider (Backend): "Evet, ben bu kontrata uyuyorum"
+├── Pact Broker: kontrat dosyalarini sakla ve paylas
+├── CI'da: her PR'da kontrat dogrulama
+```
+
+## E2E Test (Playwright)
+```typescript
+test('user can create order', async ({ page }) => {
+  await page.goto('/orders/new');
+  await page.fill('[data-testid="customer-select"]', 'ABC Corp');
+  await page.click('[data-testid="add-item-btn"]');
+  await page.fill('[data-testid="quantity-input"]', '10');
+  await page.click('[data-testid="submit-btn"]');
+  await expect(page.locator('[data-testid="success-message"]')).toBeVisible();
+  await expect(page).toHaveURL(/\/orders\/[a-z0-9-]+/);
+});
+```
+
+## Frontend Test (Vitest)
+```typescript
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
+test('shows validation error for empty name', async () => {
+  render(<ItemForm onSubmit={vi.fn()} />);
+  await userEvent.click(screen.getByRole('button', { name: /save/i }));
+  await waitFor(() => {
+    expect(screen.getByText(/name is required/i)).toBeInTheDocument();
+  });
+});
+```
+
+## Mutation Testing (Stryker)
+```
+Amac: Testlerin kalitesini olc (sadece coverage yetmez)
+├── Mutant: kodda kucuk degisiklik (> yerine <, true yerine false)
+├── Killed: test basarisiz oldu = iyi test ✅
+├── Survived: test hala gecti = zayif test 🔴
+├── Hedef: Mutation score > %80
+```
+
+## Flaky Test Yonetimi
+```
+Tespit:
+├── CI'da 3+ kez calis, farkli sonuc = flaky
+├── Quarantine: flaky testi ayri suite'e tasi
+├── Fix: race condition, timing, shared state, external dependency
+
+Onleme:
+├── Deterministic test data (fake/builder, ASLA random)
+├── Isolated DB per test class (Testcontainers)
+├── Clock abstraction (IDateTimeProvider)
+├── Retry ASLA cozum — root cause bul
+```
+
+## Test Data Management
+```csharp
+// Builder Pattern
+public class OrderBuilder
+{
+    private Guid _customerId = Guid.NewGuid();
+    private List<OrderItem> _items = new();
+    
+    public OrderBuilder WithCustomer(Guid id) { _customerId = id; return this; }
+    public OrderBuilder WithItem(Guid itemId, int qty) { _items.Add(...); return this; }
+    public Order Build() => Order.Create(_customerId, _tenantId, _items);
+}
+
+// Kullanim
+var order = new OrderBuilder().WithCustomer(customerId).WithItem(itemId, 5).Build();
+```
+
+## Test Klasor Yapisi
+```
+tests/
+├── UnitTests/
+│   ├── Domain/          -> Entity, ValueObject testleri
+│   └── Application/     -> Handler, Validator testleri
+├── IntegrationTests/
+│   ├── Api/             -> Controller/endpoint testleri
+│   └── Infrastructure/  -> Repository, cache testleri
+├── E2ETests/
+│   └── Scenarios/       -> Playwright user journey
+├── ContractTests/       -> Pact consumer/provider
+└── PerformanceTests/    -> k6 / JMeter scripts
+```
+
+## Ne Test Edilmeli?
+```
+ZORUNLU:
+├── Domain entity business rules (her invariant)
+├── Command/Query handlers (happy + error paths)
+├── Validators (valid + invalid inputs)
+├── Cross-tenant isolation
+├── Authorization (forbidden access)
+├── Critical user journeys (E2E)
+
+ISTEĞE BAGLI:
+├── Mapping profiles
+├── Simple CRUD (framework testi olmasın)
+├── Private methods (public API uzerinden test)
+```
+
+### QA Definition of Done — Yeni endpoint / kritik flow (tekrarlanmasin)
+- **Kritik user flow:** Mal Kabul kaydet, Sevkiyat, Transfer gibi "kaydet" akislari en az bir E2E veya API integration test ile dogrulanmali (POST body gonder, 201/200 bekle). Sadece unit test (Domain/Validator) yeterli degil.
+- **Request body kontrati:** Yeni endpoint'te frontend'in gonderecegi alanlar ile backend komut/validator zorunlu alanlari uyumlu olmali; testte eksik zorunlu alanla cagri 400 donmeli (veya kontrat dokumani ile karsilastirma).
+- **Frontend kritik bilesen:** Yeni modal/sayfa (ornegin hareket formu) en az smoke test: render olmali, acilinca crash olmamali (ornegin tanimsiz degisken kullanimi).
+
+## Anti-Pattern'ler
+| Anti-Pattern | Dogru Yaklasim |
+|---|---|
+| Test icinde sleep/delay | Async wait + polling |
+| Shared mutable state | Isolated test data |
+| Testing implementation | Testing behavior |
+| Assert.True(x == y) | Assert.Equal(y, x) |
+| One assert per test dogma | Logical assertion groups OK |
+| Random test data | Deterministic builders |

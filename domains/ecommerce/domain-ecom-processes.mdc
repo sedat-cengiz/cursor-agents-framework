@@ -1,0 +1,183 @@
+---
+description: "E-Commerce Domain — Is akislari, odeme, kargo, iade, kampanya, edge case'ler"
+globs: 
+alwaysApply: false
+priority: 60
+---
+
+# E-Commerce Surec Akislari
+
+## 1. Siparis Akisi (Order Flow)
+```
+Musteri sepete urun ekler -> Stok kontrol (available?) 
+-> Soft reserve (15 dk) -> Checkout baslat
+-> Adres sec (teslimat + fatura) -> Kargo yontemi sec
+-> Kupon uygula (varsa) -> Fiyat hesapla (indirim + KDV + kargo)
+-> Odeme yontemi sec -> 3D Secure dogrulama
+-> Odeme basarili -> Siparis olustur -> Stok committed
+-> Satici bildirim -> Hazirlama -> Kargoya ver -> Musteri bildirim
+```
+
+## 2. Odeme Sureci (Payment)
+```
+Odeme yontemleri:
+├── Kredi/Banka Karti: 3D Secure ZORUNLU
+├── Havale/EFT: Manuel onay (otomatik kontrol yapilabilir)
+├── Kapida Odeme: Siparis limitli (max 2000 TL, config)
+├── Dijital Cuzdan: Apple Pay, Google Pay
+├── Taksit: 2-12 ay (banka + BIN kontrolu)
+├── Puan kullanimi: Sadakat puani ile kismi odeme
+
+Entegrasyon:
+├── Turkiye: iyzico, PayTR, Param, Craftgate
+├── Global: Stripe, Adyen, PayPal
+├── Pattern: Payment Gateway Abstraction Layer
+│   ├── IPaymentGateway.InitiatePayment()
+│   ├── IPaymentGateway.CompletePayment(callbackData)
+│   ├── IPaymentGateway.Refund(transactionId, amount)
+│   └── IPaymentGateway.GetInstallmentOptions(binNumber)
+```
+
+### Odeme Edge Cases
+1. 3D Secure redirect sonrasi timeout -> Odeme durumunu sorgula, belirsiz ise cancel
+2. Duplicate payment (cift cekim) -> Idempotency key ile onle, otomatik iade
+3. Partial payment fail (taksit) -> Tum islemi iptal, stok release
+4. Callback gelmedi -> Webhook retry (3x) + polling (5 dk aralik, 30 dk max)
+5. Fraud suspicion -> Siparis hold, manual review
+6. Currency mismatch -> Kur cevirisi aninda, tolerance %1
+7. Insufficient funds -> Baska kart/yontem oneris ekrani
+
+## 3. Kargo Sureci (Shipping)
+```
+Siparis hazirlandi -> Carrier selection (kural bazli)
+-> Kargo etiketi olustur -> Paketleme
+-> Kargo teslim -> Tracking number -> Musteri SMS/email
+-> Dagitimda -> Teslim edildi -> POD (proof of delivery)
+```
+
+### Carrier Selection Rules
+```
+├── Agirlik < 5kg? -> MNG/Yurtici (en uygun fiyat)
+├── Agirlik > 30kg? -> Aras (agir yuk anlasmasi)
+├── Sehir ici? -> Motor kurye (ayni gun teslimat)
+├── Express talep? -> UPS/DHL
+├── Ucretsiz kargo: siparis tutari > 500 TL (config)
+├── Sabit kargo: 49.90 TL (config)
+├── Seller bazli: marketplace'de her satici kendi kargo anlasmasi
+```
+
+### Kargo Edge Cases
+1. Adres hatali -> Kargo firmasi feedback, musteri ile iletisim
+2. Alicida yok -> 2. teslimat denemesi, sonra sube teslim
+3. Hasarli teslimat -> Hasar raporu, yeni urun gonder veya iade
+4. Kayip kargo -> Sigorta proseduru, musteriye yeni urun veya iade
+5. Kargo firmasi API down -> Fallback carrier + retry queue
+
+## 4. Iade Sureci (Returns)
+```
+Musteri iade talebi (site/app) -> Sebebi sec -> Otomatik onay kontrol:
+├── 14 gun icerisinde? -> Otomatik onayla (tuketici hakki)
+├── 14 gun sonrasi? -> Manuel inceleme
+├── Kozmetik/ic giyim? -> Iade YASAK (hijyen kurali)
+├── Elektronik acilmis? -> Kutu hasarsiz ise kabul
+
+Onaylandi -> Ucretsiz iade kargo kodu gonder
+-> Musteri kargoya verir -> Depoya ulasir
+-> Kalite kontrol (urun durumu) -> Karar:
+├── Stoka al (hasarsiz)
+├── Indirimli satis (kutu hasarli)
+├── Hurda (kullanilamaz)
+-> Iade tutari hesapla -> Refund baslat
+-> Musteri bildirim
+```
+
+### Iade Edge Cases
+1. Farkli urun gonderildi -> Red, musteriye bildir, dogru urun iste
+2. Kullamilmis urun -> Kismi iade veya red (politikaya gore)
+3. Hediye urun iadesi -> Aliciya degil, gonderene refund
+4. Kampanyali urunun iadesi -> Kampanya kosulu bozulursa fark tahsil
+5. Partial return (coklu urun siparisinde) -> Siparis bazli degil, kalem bazli iade
+6. Refund suresi asimi -> Escalation, finans departmani
+
+## 5. Kampanya Yonetimi
+```
+Kampanya Tipleri:
+├── Yuzde indirim: %10, %20, %50 (kategori/marka/tum site)
+├── Sabit indirim: 50 TL, 100 TL
+├── X Al Y Ode: 3 al 2 ode
+├── Kargo bedava: Min siparis tutari ustunde
+├── Bundle: Birlikte al indirim
+├── Flash Sale: Sinirli sure + sinirli stok
+├── Loyalty Points: Puan kazan, puanla ode
+├── First Order: Ilk sipariste ozel indirim
+
+Kampanya Kurallari:
+├── Baslangic/Bitis tarihi
+├── Minimum siparis tutari
+├── Urun/kategori/marka kisitlamasi
+├── Musteri segmenti (yeni, VIP, tum)
+├── Kullanim limiti (toplam + kisi basi)
+├── Combinable: baska kampanyalarla birlestirilebilir mi?
+├── Priority: cakisma durumunda hangisi uygulanir?
+```
+
+## 6. Marketplace Entegrasyonu
+```
+Marketplace'ler (Turkiye):
+├── Trendyol Seller API
+├── Hepsiburada Merchant API
+├── Amazon TR Seller API
+├── N11 Merchant API
+├── GittiGidiyor (eBay TR)
+
+Entegrasyon Akislari:
+├── Urun Sync: Site -> Marketplace (urun bilgisi + stok + fiyat)
+├── Siparis Sync: Marketplace -> Site (yeni siparis cek)
+├── Stok Sync: Bidirectional (merkezi stok yonetimi)
+├── Fiyat Sync: Site -> Marketplace (kampanya dahil)
+├── Kargo Sync: Site -> Marketplace (tracking bilgisi)
+
+Pattern:
+├── Marketplace Abstraction Layer (IMarketplaceService)
+├── Polling: siparis cekme (5 dk aralik)
+├── Webhook: stok/fiyat degisikliginde push
+├── Queue: MassTransit ile async sync
+├── Conflict: site stoku < marketplace satisi = overselling riski
+│   -> Real-time stok guncelleme + safety stock buffer
+```
+
+## 7. Bildirimler
+```
+Tetikleyiciler:
+├── Siparis onaylandi -> Email + SMS + Push
+├── Odeme alindi -> Email
+├── Kargoya verildi -> SMS + Push (tracking link)
+├── Teslim edildi -> Push + Email (degerlendirme iste)
+├── Iade onaylandi -> Email
+├── Refund tamamlandi -> Email + SMS
+├── Sepet terk (30 dk) -> Email (hatirlatma)
+├── Fiyat dustu (wishlist) -> Push + Email
+├── Stok geldi (out-of-stock bildirim) -> Push + Email
+
+Kanallar:
+├── Email: SendGrid / AWS SES / SMTP
+├── SMS: NetGSM / Iletimerkezi / Twilio
+├── Push: Firebase Cloud Messaging (FCM)
+├── In-App: SignalR real-time bildirim
+```
+
+## 8. SEO & Catalog
+```
+Urun Sayfasi:
+├── URL: /urun/{slug} (SEO-friendly)
+├── Meta: title, description, og:image
+├── Schema.org: Product markup (JSON-LD)
+├── Breadcrumb: Kategori yolu
+├── Canonical URL: duplicate onleme
+
+Kategori Sayfasi:
+├── URL: /kategori/{slug}?sort=price_asc&page=2
+├── Faceted navigation: filtre + siralama
+├── Lazy loading: scroll ile urun yukleme
+├── Schema.org: ItemList markup
+```

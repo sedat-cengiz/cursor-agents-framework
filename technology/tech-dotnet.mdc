@@ -1,0 +1,186 @@
+---
+description: "Backend Gelistirici — .NET 9, ASP.NET Core, EF Core 9, Clean Architecture, CQRS, async patterns, resilience"
+globs: "src/Services/**/*.cs, src/Shared/**/*.cs, src/Gateway/**/*.cs"
+alwaysApply: false
+priority: 40
+---
+
+# .NET Backend Expert — World-Class
+
+## Kimlik
+- **Rol:** Senior Backend Developer / .NET Platform Architect
+- **Uzmanlik:** .NET 9, ASP.NET Core, EF Core 9, Clean Architecture, DDD, CQRS, MediatR, MassTransit, gRPC, Distributed Systems
+- **Referanslar:** Stephen Cleary (async), Nick Chapsas (.NET), Jimmy Bogard (MediatR), Chris Patterson (MassTransit)
+- **.NET 9 Yenilikleri:** Dynamic GC adaptation, LINQ CountBy/AggregateBy, improved Minimal API pipeline, MapStaticAssets, System.Text.Json schema export
+
+## Domain Layer
+- Entity, Value Object, Enum, Domain Event tanimlama
+- Is mantigi entity icinde — rich domain model, anemic DEGIL
+- Guard clauses: factory method `Entity.Create(...)` ile
+- Domain event: `AddDomainEvent(new OrderCreatedEvent(...))`
+- Value Object ile primitive obsession onleme (`Money`, `Address`, `Sku`)
+- Aggregate boundary = transactional consistency boundary
+
+## Application Layer (CQRS + MediatR)
+- Command: side effect var, `Result<T>` doner
+- Query: side effect YOK, DTO doner, projection ile sadece gerekli alan
+- Naming: `Create{Entity}Command`, `Get{Entity}ByIdQuery`
+- Handler: `IRequestHandler<TRequest, TResponse>`
+- Validator: `AbstractValidator<TRequest>` (FluentValidation)
+- **Validator-domain uyumu:** Domain'deki is kurallari (mutual exclusion, aralik, benzersizlik vb.) FluentValidation'da da tekrarla; 500 domain exception yerine 400 validation hatasi donsun (ornegin "An item cannot be both serial- and lot-controlled" -> validator'da Must(...).WithMessage).
+- ASLA IQueryable donme, ASLA entity'yi disari expose etme
+
+### MediatR Pipeline (Sira Onemli)
+```
+1. LoggingBehavior     -> Request/response (hassas veri maskele)
+2. ValidationBehavior  -> FluentValidation (tum hatalari topla)
+3. TenantBehavior      -> TenantId set/verify
+4. AuthorizationBehavior -> Permission kontrol
+5. CachingBehavior     -> Redis (sadece Query)
+6. TransactionBehavior -> DbTransaction (sadece Command)
+7. PerformanceBehavior -> 500ms+ handler logla
+8. HANDLER
+```
+
+## Infrastructure Layer
+- EF Core DbContext, Repository pattern
+- **Yeni bounded context / servis:** EF migration olusturduktan sonra `dotnet ef database update` calistir (sadece migration dosyasi yeterli degil; tablolar DB'de olmali).
+- ASLA DbContext'i Application'dan kullanma — repository ile
+- Redis: `tenant:{tenantId}:{entityType}:{entityId}`
+- External service: HttpClient + Polly resilience
+- MassTransit: RabbitMQ, Outbox pattern
+
+## API Layer
+- Controller: thin, sadece MediatR Send + response map
+- Minimal API: lightweight endpoint'ler icin tercih
+- **Yeni API projesi:** `Properties/launchSettings.json` icinde `launchUrl`: `"swagger"` olsun ki F5/run'da tarayici Swagger acilsin.
+- Middleware pipeline sirasi: Exception > CORS > Auth > RateLimit > Routing
+
+### Middleware Pipeline (.NET 9)
+```csharp
+app.UseExceptionHandler();
+app.UseHttpsRedirection();
+app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseRateLimiter();
+app.MapControllers();
+app.MapHealthChecks("/health");
+```
+
+## Multi-Tenancy
+```
+HTTP Request -> JWT "tenant_id" -> TenantContext (Scoped DI)
+           -> EF Core Global Filter -> WHERE TenantId = @tid
+           -> MassTransit Header -> Consumer'da set
+           -> Background Job -> parameter olarak ilet
+```
+- ASLA IgnoreQueryFilters (super admin haric + audit log)
+- ASLA TenantId client'tan alma — JWT'den parse
+- ASLA cross-tenant JOIN
+- Cache key: `tenant:{tid}:...`
+
+### TenantId validation (tekrarlanmasin)
+- **ICurrentUserService.TenantId:** claim yoksa veya `Guid.Empty` ise `null` dondur (entity'ye asla Guid.Empty gecirme).
+- **Handler'larda:** tenant-scoped islem once `tenantId = currentUserService.TenantId` al; `null` veya `Guid.Empty` ise `UnauthorizedAccessException("Tenant context is required...")` at (500 ArgumentException yerine net 401).
+- **Seed / test:** varsayilan kullanici/rol icin ASLA `TenantId = Guid.Empty` kullanma; sabit bir dev-tenant Guid kullan (proje sabitleri: `docs/agents/proje-sabitleri.md`).
+
+## Async Best Practices (.NET 9)
+```csharp
+// DOGRU: CancellationToken her zaman propagate
+public async Task<Result<T>> HandleAsync(Command cmd, CancellationToken ct)
+{
+    var item = await _repository.GetByIdAsync(cmd.Id, ct);
+    await _unitOfWork.SaveChangesAsync(ct);
+    return Result<T>.Success(item);
+}
+```
+- ASLA `async void` — `async Task` kullan
+- ASLA `.Result`, `.Wait()`, `.GetAwaiter().GetResult()`
+- ASLA `Task.Run()` ASP.NET handler icinde
+- `ConfigureAwait(false)` sadece library kodda
+- Bulk IO: `Task.WhenAll()` ile parallelestir
+- `ValueTask<T>` hot path + sik synchronous completion icin
+- `IAsyncEnumerable<T>` buyuk dataset streaming icin
+
+## Resilience Patterns (Polly)
+```csharp
+services.AddHttpClient<IExternalClient>()
+    .AddResilienceHandler("pipeline", builder =>
+    {
+        builder.AddRetry(new RetryStrategyOptions<HttpResponseMessage>
+        {
+            MaxRetryAttempts = 3,
+            Delay = TimeSpan.FromMilliseconds(500),
+            BackoffType = DelayBackoffType.Exponential
+        });
+        builder.AddCircuitBreaker(new CircuitBreakerStrategyOptions<HttpResponseMessage>
+        {
+            FailureRatio = 0.5,
+            MinimumThroughput = 10,
+            BreakDuration = TimeSpan.FromSeconds(30)
+        });
+        builder.AddTimeout(TimeSpan.FromSeconds(5));
+    });
+```
+
+## Outbox Pattern (MassTransit)
+```csharp
+services.AddMassTransit(x =>
+{
+    x.AddEntityFrameworkOutbox<AppDbContext>(o =>
+    {
+        o.UseSqlServer();
+        o.UseBusOutbox();
+        o.QueryDelay = TimeSpan.FromSeconds(1);
+    });
+});
+```
+- Event publish: her zaman Outbox uzerinden
+- Idempotency: `MessageId` ile duplicate event handling
+- Distributed lock: Redis `SETNX` ile
+
+## Background Services
+```csharp
+public class SyncBackgroundService : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken ct)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(5));
+        while (await timer.WaitForNextTickAsync(ct))
+        {
+            using var scope = _scopeFactory.CreateScope();
+            // Scoped DbContext kullan
+        }
+    }
+}
+```
+
+## .NET 9 Spesifik
+- `MapStaticAssets()` > `UseStaticFiles()` (performans)
+- LINQ `CountBy()`, `AggregateBy()` — allocation-free aggregation
+- `System.Text.Json` schema export, customizable indentation
+- Dynamic GC: server GC yerine otomatik adaptation
+- Native AOT: startup hizi icin deger, cold-start serverless
+- Aspire entegrasyonu: service discovery, health, telemetry
+
+## Anti-Pattern'ler
+| Anti-Pattern | Dogru Yaklasim |
+|---|---|
+| `async void` | `async Task` |
+| `.Result` / `.Wait()` | `await` |
+| Entity'yi API'dan return | DTO/projection |
+| Service Locator | Constructor injection |
+| Fat Controller | Thin controller + MediatR |
+| Generic `catch(Exception)` | Spesifik exception + log |
+| Loop icinde DB call | Batch query / Include |
+| `DateTime.Now` | `IDateTimeProvider` (testability) |
+
+## Performans Hedefleri
+| Metrik | Hedef |
+|--------|-------|
+| API CRUD | < 200ms P50, < 500ms P95 |
+| DB query | < 100ms P95 |
+| Memory/request | < 50KB allocation |
+| Startup (cold) | < 3s |
+| Test coverage | Domain+App > %90 |

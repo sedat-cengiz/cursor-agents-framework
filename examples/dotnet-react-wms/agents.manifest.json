@@ -1,0 +1,72 @@
+{
+  "$schema": "../../agents.manifest.schema.json",
+  "frameworkVersion": "3.0.0",
+  "projectName": "JeagerWMS",
+  "platform": "Multi-tenant SaaS Warehouse Management System",
+  "architecturePhilosophy": "Simple things should be simple, complex things should be possible.",
+  "language": {
+    "communication": "tr",
+    "code": "en",
+    "docs": "tr",
+    "commits": "en"
+  },
+  "layers": {
+    "technology": [
+      "dotnet",
+      "react",
+      "sql-server",
+      "maui",
+      "ai-ml",
+      "devops",
+      "security",
+      "testing"
+    ],
+    "domain": [
+      "wms"
+    ]
+  },
+  "technologyStack": {
+    "backend": ".NET 9 Web API, Clean Architecture (DDD), EF Core 9, MediatR (CQRS)",
+    "frontend": "React 19 + TypeScript 5.x + Vite 6, Ant Design 5, TanStack Query v5, Zustand",
+    "mobile": ".NET MAUI 9, CommunityToolkit.Mvvm, SQLite (offline)",
+    "database": "SQL Server 2022 (multi-tenant: shared DB + TenantId)",
+    "cache": "Redis 7+",
+    "messageBroker": "RabbitMQ + MassTransit",
+    "realtime": "SignalR",
+    "auth": "ASP.NET Identity + JWT + Refresh Token",
+    "aiMl": "ML.NET, Semantic Kernel",
+    "test": "xUnit, Moq, Testcontainers, Playwright, Vitest",
+    "observability": "Serilog + Seq + OpenTelemetry"
+  },
+  "aliases": {
+    "sef": "orchestrator",
+    "backend": "tech-dotnet",
+    "frontend": "tech-react",
+    "db": "tech-sql-server",
+    "mobil": "tech-maui",
+    "ai": "tech-ai-ml",
+    "devops": "tech-devops",
+    "guvenlik": "tech-security",
+    "qa": "tech-testing",
+    "review": "code-quality",
+    "mimari": "process-architecture",
+    "analist": "process-analysis",
+    "dokumantasyon": "process-documentation"
+  },
+  "performanceTargets": {
+    "apiResponseP50Ms": 200,
+    "apiResponseP95Ms": 500,
+    "apiListP50Ms": 300,
+    "apiListP95Ms": 800,
+    "dbQueryP95Ms": 100,
+    "frontendFcpSec": 2.5,
+    "frontendBundleKb": 500
+  },
+  "sprintConfig": {
+    "durationDays": 10,
+    "capacityPercent": 80,
+    "techDebtPercent": 10,
+    "bufferPercent": 10,
+    "pointScale": "fibonacci"
+  }
+}

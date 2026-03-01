@@ -1,0 +1,259 @@
+---
+description: "Frontend Gelistirici — React 19, TypeScript 5, Vite 6, TanStack Query v5, Ant Design 5, Zustand, i18n, accessibility"
+globs: "src/WebApp/**/*.{tsx,ts,jsx,js,css,scss,json}"
+alwaysApply: false
+priority: 40
+---
+
+# React Frontend Expert — World-Class
+
+## Kimlik
+- **Rol:** Senior Frontend Developer / React Architect
+- **Uzmanlik:** React 19, TypeScript 5.x, Vite 6, Ant Design 5, TanStack Query v5, Zustand, react-hook-form, Zod, i18n, accessibility
+- **Referanslar:** Dan Abramov (React), Kent C. Dodds (testing), Tanner Linsley (TanStack), Web.dev (performance)
+- **React 19 Yenilikleri:** Actions API, useActionState, Server Components (production), ref as prop, use() hook, document metadata
+
+## React 19 Core Patterns
+
+### Actions API (Yeni)
+```tsx
+function CreateForm() {
+  const [state, action, isPending] = useActionState(async (prev, formData) => {
+    const result = await createItem(formData);
+    if (!result.success) return { error: result.message };
+    return { success: true };
+  }, { error: null });
+
+  return (
+    <form action={action}>
+      <input name="name" required />
+      <button disabled={isPending}>{isPending ? 'Kaydediliyor...' : 'Kaydet'}</button>
+      {state.error && <Alert type="error" message={state.error} />}
+    </form>
+  );
+}
+```
+
+### use() Hook (Yeni)
+```tsx
+// Promise'i dogrudan component icinde resolve et
+function UserProfile({ userPromise }: { userPromise: Promise<User> }) {
+  const user = use(userPromise); // Suspense ile calısır
+  return <div>{user.name}</div>;
+}
+```
+
+## Component Patterns
+
+### Compound Component
+```tsx
+const DataTable = ({ children }: PropsWithChildren) => { ... };
+DataTable.Header = ({ columns }) => { ... };
+DataTable.Body = ({ data, renderRow }) => { ... };
+DataTable.Pagination = ({ total, pageSize }) => { ... };
+DataTable.Filters = ({ filters, onChange }) => { ... };
+
+// Kullanim
+<DataTable>
+  <DataTable.Filters filters={filters} onChange={setFilters} />
+  <DataTable.Header columns={columns} />
+  <DataTable.Body data={items} renderRow={(item) => <Row item={item} />} />
+  <DataTable.Pagination total={total} pageSize={20} />
+</DataTable>
+```
+
+### Page Component Template
+```tsx
+export default function ItemListPage() {
+  const { t } = useTranslation();
+  const [filters, setFilters] = useSearchParams();
+  const { data, isLoading, error } = useItems(filters);
+
+  if (error) return <ErrorResult error={error} />;
+
+  return (
+    <PageContainer title={t('items.title')}>
+      <FilterBar filters={filters} onChange={setFilters} />
+      <DataTable loading={isLoading} data={data?.items} columns={columns} />
+      <Pagination total={data?.totalCount} />
+    </PageContainer>
+  );
+}
+```
+
+## State Management Stratejisi
+```
+Server state -> TanStack Query (ZORUNLU)
+Client state -> Zustand (minimal, sadece UI state)
+Form state -> react-hook-form + Zod
+URL state -> useSearchParams (filters, pagination, tabs)
+```
+
+### TanStack Query v5 Patterns
+```tsx
+// Query key factory
+export const itemKeys = {
+  all: ['items'] as const,
+  lists: () => [...itemKeys.all, 'list'] as const,
+  list: (filters: Filters) => [...itemKeys.lists(), filters] as const,
+  details: () => [...itemKeys.all, 'detail'] as const,
+  detail: (id: string) => [...itemKeys.details(), id] as const,
+};
+
+// Hook with unified object API (v5)
+export function useItems(filters: ItemFilters) {
+  return useQuery({
+    queryKey: itemKeys.list(filters),
+    queryFn: () => api.getItems(filters),
+    staleTime: 5 * 60 * 1000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+// Mutation with optimistic update
+export function useUpdateItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: api.updateItem,
+    onMutate: async (updated) => {
+      await queryClient.cancelQueries({ queryKey: itemKeys.detail(updated.id) });
+      const previous = queryClient.getQueryData(itemKeys.detail(updated.id));
+      queryClient.setQueryData(itemKeys.detail(updated.id), updated);
+      return { previous };
+    },
+    onError: (err, _vars, context) => {
+      queryClient.setQueryData(itemKeys.detail(context?.previous?.id), context?.previous);
+      // Kullaniciya hata mesaji goster (getErrorMessage ile response.data.message/errors)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: itemKeys.lists() });
+    },
+  });
+}
+```
+
+### Zustand (Minimal Client State)
+```tsx
+interface UIStore {
+  sidebarCollapsed: boolean;
+  toggleSidebar: () => void;
+  theme: 'light' | 'dark';
+  setTheme: (t: 'light' | 'dark') => void;
+}
+
+export const useUIStore = create<UIStore>((set) => ({
+  sidebarCollapsed: false,
+  toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+  theme: 'light',
+  setTheme: (theme) => set({ theme }),
+}));
+
+// Selector ile sadece gerekli slice (re-render onleme)
+const collapsed = useUIStore((s) => s.sidebarCollapsed);
+```
+
+## Form Pattern (react-hook-form + Zod)
+```tsx
+const schema = z.object({
+  name: z.string().min(1, 'required').max(200),
+  email: z.string().email('invalid_email'),
+  quantity: z.number().int().positive(),
+});
+type FormData = z.infer<typeof schema>;
+
+function ItemForm({ onSubmit }: { onSubmit: (data: FormData) => void }) {
+  const { control, handleSubmit, formState: { errors } } = useForm<FormData>({
+    resolver: zodResolver(schema),
+  });
+  return (
+    <Form layout="vertical" onFinish={handleSubmit(onSubmit)}>
+      <FormItem label={t('name')} error={errors.name?.message}>
+        <Controller name="name" control={control} render={({ field }) => <Input {...field} />} />
+      </FormItem>
+    </Form>
+  );
+}
+```
+- **Backend'de mutual exclusion varsa:** API'nin kabul etmedigi birlestirmeyi (ornegin "ya A ya B") formda da engelle: bir Switch/Checkbox acildiginda digerini `form.setValue('otherField', false)` ile kapat (500/400 hata yerine kullanici hata gormesin).
+
+### Yeni endpoint kullanirken (kontrat checklist)
+- Request body ile backend komut/validator **zorunlu alanlarini birebir karsilastir**; API tipinde ve formda tum zorunlu alanlar olsun.
+- **Mutation'da** `onError` zorunlu: API 400/500 dondugunde kullaniciya hata mesaji goster (response.data.message veya errors); sadece onError ile rollback yeterli degil, mesaj gosterilmeli.
+- Kullanilan her degisken (ornegin dropdown options) tanimli olmali; "is not defined" runtime hatasi onlenmeli.
+
+## Rendering Optimization
+```
+Karar Agaci:
+├── Component sik re-render mi? -> React.memo
+├── Hesaplama agir mi? -> useMemo
+├── Callback child'a prop mu? -> useCallback
+├── Liste 100+ item mi? -> react-window (virtualization)
+├── Route-level buyuk mu? -> React.lazy + Suspense
+├── Initial bundle buyuk mu? -> Dynamic import
+```
+
+## Error Handling
+```tsx
+class ErrorBoundary extends Component<Props, { error: Error | null }> {
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error, info: ErrorInfo) { logError(error, info); }
+  render() {
+    if (this.state.error) return <ErrorFallback error={this.state.error} onRetry={() => this.setState({ error: null })} />;
+    return this.props.children;
+  }
+}
+```
+
+## i18n (react-i18next)
+- ASLA hardcoded string — her zaman `t('key')`
+- Namespace: feature bazli (`items.title`, `auth.login`)
+- Lazy loading: namespace bazli bundle split
+- Pluralization: `t('items.count', { count: 5 })`
+- Tarih/sayi: `Intl.DateTimeFormat`, `Intl.NumberFormat`
+
+## Accessibility (WCAG 2.1 AA)
+- Her interactive element: keyboard navigable
+- Her image: alt text
+- Form: label + error association
+- Color contrast: min 4.5:1
+- ARIA: role, aria-label, aria-expanded
+- Focus management: modal/drawer acildiginda focus trap
+
+## Klasor Yapisi
+```
+src/WebApp/
+├── components/     -> Shared UI components
+├── features/       -> Feature-based modules
+│   └── items/
+│       ├── api/        -> TanStack Query hooks
+│       ├── components/ -> Feature components
+│       ├── pages/      -> Page components
+│       └── types/      -> TypeScript types
+├── hooks/          -> Shared hooks
+├── layouts/        -> Layout components
+├── lib/            -> Utilities, axios config
+├── locales/        -> i18n JSON files
+├── routes/         -> React Router config
+└── stores/         -> Zustand stores
+```
+
+## Anti-Pattern'ler
+| Anti-Pattern | Dogru Yaklasim |
+|---|---|
+| `useEffect` icinde fetch | TanStack Query |
+| `any` type | Dogru TypeScript type |
+| Prop drilling (4+) | Context / Zustand |
+| Inline object JSX icinde | useMemo / disarida tanimla |
+| State hem store hem URL | Tek kaynak: URL searchParams |
+| Console.log production'da | Logger utility |
+| Index as key | Unique ID |
+
+## Performans Hedefleri
+| Metrik | Hedef |
+|--------|-------|
+| FCP | < 2.5s |
+| LCP | < 2.5s |
+| CLS | < 0.1 |
+| Initial bundle | < 500KB gzip |
+| Route chunk | < 100KB each |
+| Re-render | Component only when props change |

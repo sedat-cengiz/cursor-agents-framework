@@ -1,0 +1,171 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/sedat-cengiz/cursor-agents-framework/agents.manifest.schema.json",
+  "title": "Cursor Agents Framework — Project Manifest",
+  "description": "Defines which agent layers, technology packs, and domain packs are active for this project.",
+  "type": "object",
+  "required": ["projectName", "platform", "layers"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference for IDE autocompletion"
+    },
+    "frameworkVersion": {
+      "type": "string",
+      "description": "Cursor Agents Framework version this manifest targets",
+      "default": "3.0.0"
+    },
+    "projectName": {
+      "type": "string",
+      "description": "Project name (used in global-conventions.mdc)",
+      "examples": ["MyApp", "JeagerWMS", "ShopPro"]
+    },
+    "platform": {
+      "type": "string",
+      "description": "Platform description",
+      "examples": [
+        "Multi-tenant SaaS Warehouse Management System",
+        "E-Commerce Platform",
+        "Internal HR Portal"
+      ]
+    },
+    "architecturePhilosophy": {
+      "type": "string",
+      "description": "Guiding architecture principle",
+      "default": "Simple things should be simple, complex things should be possible."
+    },
+    "language": {
+      "type": "object",
+      "description": "Language preferences for communication, code, and docs",
+      "properties": {
+        "communication": {
+          "type": "string",
+          "description": "Language for user-agent communication",
+          "enum": ["tr", "en", "de", "fr", "es", "pt", "ja", "ko", "zh"],
+          "default": "tr"
+        },
+        "code": {
+          "type": "string",
+          "description": "Language for variable/method/class names and code comments",
+          "enum": ["en"],
+          "default": "en"
+        },
+        "docs": {
+          "type": "string",
+          "description": "Language for documentation files",
+          "enum": ["tr", "en", "de", "fr", "es", "pt", "ja", "ko", "zh"],
+          "default": "tr"
+        },
+        "commits": {
+          "type": "string",
+          "description": "Language for commit messages",
+          "enum": ["en"],
+          "default": "en"
+        }
+      },
+      "additionalProperties": false
+    },
+    "layers": {
+      "type": "object",
+      "description": "Layer selection. Core, Process, and Learning are always installed.",
+      "required": ["technology"],
+      "properties": {
+        "technology": {
+          "type": "array",
+          "description": "Technology packs to install",
+          "items": {
+            "type": "string",
+            "enum": [
+              "dotnet",
+              "react",
+              "python",
+              "sql-server",
+              "maui",
+              "ai-ml",
+              "devops",
+              "security",
+              "testing"
+            ]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "domain": {
+          "type": "array",
+          "description": "Domain packs to install (optional)",
+          "items": {
+            "type": "string",
+            "examples": ["wms", "ecommerce"]
+          },
+          "uniqueItems": true,
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+    "technologyStack": {
+      "type": "object",
+      "description": "Detailed technology stack (overrides defaults from tech packs)",
+      "properties": {
+        "backend": { "type": "string" },
+        "frontend": { "type": "string" },
+        "mobile": { "type": "string" },
+        "database": { "type": "string" },
+        "cache": { "type": "string" },
+        "messageBroker": { "type": "string" },
+        "realtime": { "type": "string" },
+        "auth": { "type": "string" },
+        "aiMl": { "type": "string" },
+        "test": { "type": "string" },
+        "observability": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "aliases": {
+      "type": "object",
+      "description": "Custom alias-to-rule mappings (override defaults)",
+      "additionalProperties": {
+        "type": "string",
+        "description": "Target .mdc filename (without extension)"
+      },
+      "examples": [
+        {
+          "backend": "tech-dotnet",
+          "frontend": "tech-react",
+          "db": "tech-sql-server"
+        }
+      ]
+    },
+    "performanceTargets": {
+      "type": "object",
+      "description": "Override default performance targets",
+      "properties": {
+        "apiResponseP50Ms": { "type": "integer", "default": 200 },
+        "apiResponseP95Ms": { "type": "integer", "default": 500 },
+        "apiListP50Ms": { "type": "integer", "default": 300 },
+        "apiListP95Ms": { "type": "integer", "default": 800 },
+        "dbQueryP95Ms": { "type": "integer", "default": 100 },
+        "frontendFcpSec": { "type": "number", "default": 2.5 },
+        "frontendBundleKb": { "type": "integer", "default": 500 }
+      },
+      "additionalProperties": true
+    },
+    "sprintConfig": {
+      "type": "object",
+      "description": "Sprint/agile configuration",
+      "properties": {
+        "durationDays": { "type": "integer", "default": 10 },
+        "capacityPercent": { "type": "integer", "default": 80 },
+        "techDebtPercent": { "type": "integer", "default": 10 },
+        "bufferPercent": { "type": "integer", "default": 10 },
+        "pointScale": {
+          "type": "string",
+          "enum": ["fibonacci", "linear", "tshirt"],
+          "default": "fibonacci"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

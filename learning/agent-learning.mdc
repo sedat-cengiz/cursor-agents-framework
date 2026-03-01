@@ -1,0 +1,88 @@
+---
+description: "Surekli Ogrenme Sistemi — Agent'larin proje deneyimlerini kaydetmesi ve birikmis bilgiden yararlanmasi"
+globs: 
+alwaysApply: true
+priority: 5
+---
+
+# Surekli Ogrenme Sistemi
+
+## Amac
+Agent'lar gorevleri sirasinda elde ettikleri ogrenmeleri yapilandirilmis formatta kaydeder. Bu bilgiler gelecek gorevlerde ve projelerde kullanilir.
+
+## Is Agent Tarafindan Yapilir, Ogrenme Agent Tarafindan Kaydedilir
+- Duzeltme veya yeni ozellik **ilgili agent'a atanir** (kullanici @agent veya taskboard/handoff ile); duzeltmeyi **agent yapar**, kullanici degil.
+- **Duzeltmeyi yapan agent** is bittikten sonra: (1) `docs/agents/lessons-learned.md` dosyasina ders ekler, (2) evrensel ise ilgili tech-*.mdc veya taskboard checklist gunceller. Boylece kendi kendine ogrenme tamamlanir.
+- Gorev alan her agent, gorev oncesi `lessons-learned.md` ve taskboard "Agent checklist" / "Neden agent yapmadi" bolumunu okur; tekrarlanmasin.
+
+## Ogrenme Tetikleyicileri
+1. **Beklenmeyen sorun** cozuldugunde
+2. **Anti-pattern** kesfedildiginde
+3. **Performans iyilestirmesi** yapildiginda (olculebilir fark)
+4. **Yeni best practice** kesfedildiginde
+5. **Mimari karar** alindiginda ve sonuclari gozlemlendiginde
+6. **Hata duzeltildiginde** (root cause ve onlem)
+
+## Kayit Formati (`docs/agents/lessons-learned.md`)
+```markdown
+## YYYY-MM-DD | [Agent Rolu] | [Konu Basligi]
+
+### Baglam
+[Hangi gorev yapiliyordu]
+
+### Kesfedilen
+[Ne ogrendi — spesifik ve somut]
+
+### Kategori
+[Architecture | Performance | Security | Testing | DevOps | Domain | Process | Tool]
+
+### Uygulanabilirlik
+[Projeye Ozel | Evrensel]
+
+### Uygulama
+[Bu bilgi nasil uygulandı veya uygulanmali]
+```
+
+## Bilgi Okuma Protokolu
+### Gorev Baslarken
+1. Projenin `docs/agents/lessons-learned.md` oku
+2. Projenin `docs/agents/taskboard.md` icindeki "Agent checklist" ve "Neden agent yapmadi" tablosunu oku; ayni hatalar tekrarlanmasin
+3. Ilgili konudaki dersleri dikkate al
+4. Anti-pattern'lerden kacin, best practice'leri uygula
+
+### Global Bilgi Erisimi
+Global bilgi: `~/.cursor/skills/jeager-agents/v2/learning/knowledge-base/lessons-learned.md`
+
+## Evrensel Ders Yayilimi
+Ders "Evrensel" ise:
+1. Projenin `docs/agents/lessons-learned.md` dosyasina kaydet
+2. Global `knowledge-base/lessons-learned.md` dosyasina da kaydet
+3. Kural guncellemesi gerekiyorsa: **Uygulama** alaninda hangi .mdc dosyasina ne eklenecegini somut yaz (ornegin "tech-dotnet.mdc Multi-Tenancy bolumune su madde eklenebilir: ..."). Evrensel dersler periyodik olarak v2 kurallarina tasinir; bu notlar v2 guncellemesinde kullanilir.
+4. Istege bagli: Projede `docs/agents/evrensel-dersler-v2-icin.md` dosyasi tutulabilir; Evrensel derslerin kopyasi orada toplanir, v2 guncellemesi yapilirken tek yerden okunur.
+
+## Kural Evrimi
+Her 5-10 evrensel ders biriktiginde:
+1. Ilgili `.mdc` dosyasini guncelle (anti-pattern, checklist, karar agaci)
+2. `knowledge-base/evolution-log.md` dosyasina kaydet
+3. Master kopyayi guncelle
+
+## Gorev Sonrasi — Zorunlu Ogrenme Adimi (her agent)
+Isi yapan agent gorevi "tamamladim" demeden once su kontrolu yapsin:
+1. **Bu gorevde yeni bir sey kesfettim mi?** (beklenmeyen hata cozumu, unutulan checklist maddesi, yanlis pattern kullanimi duzeltmesi)
+2. **Evet ise:** `docs/agents/lessons-learned.md` dosyasina yukaridaki formatta kayit ekle. "Uygulama" alaninda somut ol: "tech-dotnet.mdc Multi-Tenancy bolumune su madde eklenebilir: ..."
+3. **Evrensel ise:** Ayni dersi `~/.cursor/skills/jeager-agents/v2/learning/knowledge-base/lessons-learned.md` dosyasina da ekle (veya "v2 knowledge-base'e tasinmali" notu dus).
+4. **Kural guncellemesi gerekiyorsa:** "Uygulama"da hangi .mdc dosyasina ne eklenecegini yaz; ileride v2 guncellemesinde kullanilsin.
+
+Boylece her gorev sonrasi ogrenme tek bir adimda kayda gecer; unutma azalir.
+
+## Evrensel Dersleri v2 Kurallarina Tasima (periyodik)
+- Proje bittiginde veya her N sprint'te: Projenin `lessons-learned.md` dosyasindaki **Evrensel** dersleri incele.
+- "Uygulama" alaninda .mdc guncellemesi onerisi varsa, v2 ilgili dosyaya ekle (ornegin tech-dotnet.mdc, tech-react.mdc).
+- Yapilan her v2 guncellemesini `knowledge-base/evolution-log.md` dosyasina kisa satir olarak ekle (tarih, hangi dosya, ne eklendi).
+- Boylece tum projelerden cikan evrensel dersler v2'ye yansir; yeni projeler guncel kurallarla baslar.
+
+## KURALLAR
+- Her onemli kesfin KAYIT EDILMESI zorunlu
+- SOMUT ve UYGULANABILIR olmali
+- "Dikkatli ol" DEGIL, "X durumunda Y yap" KULLAN
+- Birden fazla agent ilgilendiriyorsa her birinde referans ver

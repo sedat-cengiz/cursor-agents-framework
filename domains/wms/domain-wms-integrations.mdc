@@ -1,0 +1,176 @@
+---
+description: "WMS Domain — Entegrasyonlar: barcode, RFID, ERP, TMS, IoT, label printing, carrier API"
+globs: 
+alwaysApply: false
+priority: 60
+---
+
+# WMS Entegrasyonlar
+
+## Barkod Standartlari (GS1)
+```
+Barkod Tipleri:
+├── EAN-13/UPC-A: Urun tanimlama (GTIN)
+├── Code 128: Genel amacli (konum, lot, seri)
+├── GS1-128: Lojistik etiketi (SSCC, expiry, lot)
+├── GS1 DataMatrix: 2D, kucuk urunler, ilac
+├── QR Code: URL, bilgi paylasimi
+
+GS1 Application Identifiers:
+├── (01) GTIN: Urun kodu
+├── (10) Lot/Batch: Parti numarasi
+├── (17) Expiry Date: Son kullanma tarihi (YYMMDD)
+├── (21) Serial Number: Seri numarasi
+├── (00) SSCC: Palet/koli tanimlayici (18 digit)
+├── (37) Quantity: Miktar
+```
+
+## Barkod Tarama (ZXing.NET / Camera.MAUI)
+```csharp
+// Barkod parse
+public class BarcodeParser
+{
+    public ParsedBarcode Parse(string rawBarcode)
+    {
+        if (rawBarcode.StartsWith("(01)") || rawBarcode.StartsWith("01"))
+            return ParseGS1(rawBarcode);
+        if (rawBarcode.Length == 13 || rawBarcode.Length == 12)
+            return new ParsedBarcode { Type = BarcodeType.GTIN, Value = rawBarcode };
+        return new ParsedBarcode { Type = BarcodeType.Generic, Value = rawBarcode };
+    }
+}
+```
+
+## RFID Entegrasyonu
+```
+Kullanim Alanlari:
+├── Palet/koli takibi (UHF RFID, 10m menzil)
+├── Asset tracking (forklift, ekipman)
+├── Dock door otomatik okuma (portal reader)
+├── Bulk receiving (palet bazli toplu okuma)
+
+Protokol:
+├── EPC Gen2 (UHF): en yaygin, depo icin ideal
+├── NFC (HF): yakin mesafe, mobil cihaz
+├── BLE Beacon: konum takibi (RTLS)
+
+Entegrasyon:
+├── RFID Reader -> MQTT/REST -> WMS API
+├── Tag format: EPC (Electronic Product Code)
+├── Batch read: bir okumada 100+ tag
+├── Exception: okunamayan tag -> manuel barkod tarama fallback
+```
+
+## Label Printing (ZPL — Zebra)
+```zpl
+^XA
+^FO50,50^A0N,40,40^FD{{ProductName}}^FS
+^FO50,100^BY3^BCN,100,Y,N,N^FD{{Barcode}}^FS
+^FO50,230^A0N,25,25^FDLot: {{LotNumber}}^FS
+^FO50,260^A0N,25,25^FDExp: {{ExpiryDate}}^FS
+^FO50,290^A0N,25,25^FDQty: {{Quantity}} {{UOM}}^FS
+^FO50,330^BY2^BQN,2,5^FDQA,{{QRData}}^FS
+^XZ
+```
+- Label tipi: urun etiketi, konum etiketi, koli etiketi, palet etiketi
+- Printer: Zebra ZT/ZD serisi (ZPL), SATO (SBPL), TSC
+- Entegrasyon: Raw TCP socket veya print service API
+
+## ERP Entegrasyonu
+```
+Veri Akislari:
+├── ERP -> WMS:
+│   ├── Purchase Order (mal kabul emri)
+│   ├── Sales Order (sevkiyat emri)
+│   ├── Product Master (urun bilgisi)
+│   ├── Customer/Supplier Master
+│   └── Transfer Order (depolar arasi)
+├── WMS -> ERP:
+│   ├── Goods Receipt (mal kabul teyidi)
+│   ├── Goods Issue (mal cikis teyidi)
+│   ├── Stock Adjustment (stok duzeltme)
+│   ├── Inventory Snapshot (stok durumu)
+│   └── Shipment Confirmation (sevk teyidi)
+
+Entegrasyon Yontemi:
+├── REST API (tercih edilen)
+├── Message Queue (RabbitMQ — event-driven)
+├── Flat file (CSV/XML — legacy ERP icin)
+├── Database link (son care — tight coupling)
+```
+
+## TMS (Transport Management) Entegrasyonu
+```
+WMS -> TMS:
+├── Shipment request (pickup, delivery address, weight, volume)
+├── Carrier preference
+├── Service level (express, standard, economy)
+
+TMS -> WMS:
+├── Carrier assignment
+├── Tracking number
+├── ETA (estimated time of arrival)
+├── POD (proof of delivery)
+```
+
+## Carrier (Kargo) API Ornekleri
+```
+Turkiye:
+├── Aras Kargo: REST API (shipment create, tracking)
+├── Yurtici Kargo: REST API
+├── MNG Kargo: REST API
+├── Surat Kargo: REST API
+├── UPS Turkey: UPS Developer Kit
+├── DHL: DHL Express API
+
+Entegrasyon Pattern:
+├── Carrier Abstraction Layer
+│   ├── ICarrierService.CreateShipment()
+│   ├── ICarrierService.GetTrackingInfo()
+│   ├── ICarrierService.CancelShipment()
+│   └── ICarrierService.GetLabel()
+├── Her carrier icin concrete implementation
+├── Rate comparison: en uygun kargo secimi
+```
+
+## IoT Entegrasyonu
+```
+Sensor Tipleri:
+├── Sicaklik/Nem: Soguk zincir izleme (gida, ilac)
+├── Hareket: Forklift/AGV takibi
+├── Agirlik: Platform tereazi (auto-weighing)
+├── Kapı sensor: Dock door acik/kapali
+├── Isik bariyeri: Guvenlik alani
+
+Protokol: MQTT (Mosquitto broker)
+├── Topic format: warehouse/{warehouseId}/zone/{zoneId}/sensor/{sensorId}
+├── Payload: { "type": "temperature", "value": 4.2, "unit": "C", "timestamp": "..." }
+├── Alert: threshold asildiginda SignalR ile dashboard bildirimi
+├── Storage: time-series DB (TimescaleDB) veya InfluxDB
+```
+
+## E-Fatura / E-Irsaliye
+```
+Turkiye (GIB):
+├── E-Fatura: UBL-TR 1.2 format
+├── E-Irsaliye: Sevkiyat belgesi
+├── Entegrator: Foriba, Logo, QNB, Edepo
+├── Format: XML (UBL)
+├── Onay: GIB portal uzerinden
+```
+
+## Robotics & Automation
+```
+Otomasyon Seviyeleri:
+├── Level 1: Barkod + RF terminal (mevcut)
+├── Level 2: Conveyor + sortation system
+├── Level 3: AS/RS (Automated Storage/Retrieval)
+├── Level 4: AGV/AMR (Autonomous Mobile Robot)
+├── Level 5: Goods-to-Person (robotik raf)
+
+WMS Entegrasyon:
+├── WCS (Warehouse Control System) layer
+├── WMS -> WCS: gorev gonder (pick, putaway, transfer)
+├── WCS -> WMS: gorev tamamlandi, hata bildirimi
+├── Protokol: REST API veya proprietary (vendor-specific)
+```

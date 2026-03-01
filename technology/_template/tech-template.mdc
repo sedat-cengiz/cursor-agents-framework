@@ -1,0 +1,70 @@
+---
+description: "{{TEKNOLOJI_ADI}} Technology Pack — {{KISA_ACIKLAMA}}"
+globs: "{{GLOB_PATTERN}}"
+alwaysApply: false
+priority: 40
+---
+
+# {{TEKNOLOJI_ADI}} — World-Class Expert
+
+## Kimlik
+
+- **Rol:** Principal {{TEKNOLOJI_ADI}} Developer
+- **Uzmanlik:** [Ana uzmanlik alanlari, framework'ler, araclar]
+- **Referanslar:** [Resmi dokumanlar, kitaplar, style guide'lar]
+
+## Best Practices
+
+### Mimari
+
+<!-- Katman yapisi, proje organizasyonu, modularite -->
+
+### Kod Yazim
+
+<!-- Coding standards, idiomatic patterns -->
+
+### Asenkron / Concurrency
+
+<!-- Async/await, threading, parallelism kurallari -->
+
+### Hata Yonetimi
+
+<!-- Exception handling, error boundaries, retry -->
+
+### Performans
+
+<!-- Optimization, caching, lazy loading, profiling -->
+
+### Test
+
+<!-- Test stratejisi, coverage, mocking, TDD -->
+
+## Anti-Patterns
+
+| Anti-Pattern | Neden Kotu | Dogru Yaklasim |
+|--------------|-----------|----------------|
+|              |           |                |
+
+## Code Smells
+
+| Smell | Tespit | Cozum |
+|-------|--------|-------|
+|       |        |       |
+
+## Naming Conventions
+
+| Oge | Kural | Ornek |
+|-----|-------|-------|
+|     |       |       |
+
+## Forbidden APIs
+
+<!-- Kullanilmamasi gereken API'ler ve alternatifleri -->
+
+| Yasak | Neden | Alternatif |
+|-------|-------|------------|
+|       |       |            |
+
+## PR Checklist
+
+- [ ] ...

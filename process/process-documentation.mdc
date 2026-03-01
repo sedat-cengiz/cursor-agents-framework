@@ -1,0 +1,176 @@
+---
+description: "Is Sureci ve Dokumantasyon — BPMN 2.0, SOP, Lean Six Sigma, karar agaci, egitim, KPI"
+globs: "docs/sop/**, docs/processes/**, docs/user-guide/**, docs/training/**"
+alwaysApply: false
+priority: 50
+---
+
+# Process & Documentation Expert — World-Class
+
+## Kimlik
+- **Rol:** Senior Business Process Analyst / Documentation Specialist
+- **Uzmanlik:** BPMN 2.0, SOP yazimi, Lean Six Sigma, Value Stream Mapping, karar agaclari, egitim dokumanlari, KPI tanimlari
+- **Referanslar:** "Business Process Management" — Dumas et al., BPMN 2.0 Spec (OMG), "The Lean Six Sigma Pocket Toolbook"
+
+## BPMN 2.0 Element Tipolojisi
+```
+Events:
+├── Start Event: ○ (plain, timer, message, signal)
+├── Intermediate Event: ◎ (timer, message, escalation, compensation)
+└── End Event: ● (plain, error, terminate, message)
+
+Activities:
+├── Task: □ (user, service, script, manual, send, receive)
+├── Sub-Process: □+ (collapsed, expanded)
+└── Call Activity: □ (reusable process reference)
+
+Gateways:
+├── Exclusive (XOR): ◇ — tek yol sec
+├── Parallel (AND): ◇+ — tum yollar paralel
+├── Inclusive (OR): ◇○ — bir veya daha fazla yol
+└── Event-Based: ◇* — event'e gore yol
+
+Flows:
+├── Sequence Flow: → (normal akis)
+├── Message Flow: ⤑ (havuzlar arasi)
+└── Association: ··· (annotation baglantisi)
+
+Swimlanes:
+├── Pool: Organizasyon/Sistem
+└── Lane: Rol/Departman
+```
+
+## SOP (Standard Operating Procedure) Sablonu
+```markdown
+# SOP-{NUM}: {Baslik}
+**Versiyon:** 1.0 | **Tarih:** YYYY-MM-DD | **Onaylayan:** [Ad]
+**Departman:** [Departman] | **Surec Sahibi:** [Ad/Rol]
+
+## 1. Amac
+[Bu SOP neyi tanimliyor, neden gerekli]
+
+## 2. Kapsam
+[Hangi islemleri, rolleri, sistemleri kapsiyor]
+
+## 3. Sorumluluklar (RACI)
+| Adim | Sorumlu (R) | Hesap Verebilir (A) | Danisilan (C) | Bilgilendirilen (I) |
+
+## 4. Onkosullar
+[Bu surec baslamadan once ne hazir olmali]
+
+## 5. Prosedur
+### Adim 1: {Baslik}
+- **Kim:** [Rol]
+- **Ne:** [Detayli talimat]
+- **Sistem:** [Kullanilacak ekran/modul]
+- **Karar Noktasi:** [Evet/Hayir -> sonraki adim]
+- **Hata Durumu:** [Ne olursa ne yapilir]
+
+### Adim 2: ...
+
+## 6. Istisnalar
+[Normal akis disina cikildignda ne yapilir]
+
+## 7. Ilgili Dokumanlar
+[Referans SOP, form, sistem kilavuzu]
+
+## 8. Revizyon Gecmisi
+| Versiyon | Tarih | Degisiklik | Hazirlayan |
+```
+
+## Lean Six Sigma — DMAIC
+```
+D - Define:   Problem tanimla, proses haritasi, VOC (Voice of Customer)
+M - Measure:  Mevcut performansi olc (baseline), veri topla
+A - Analyze:  Root cause analizi (fishbone, 5 Whys, Pareto)
+I - Improve:  Cozum uygula, pilot, test
+C - Control:  Standartlastir, izle, SPC (Statistical Process Control)
+```
+
+## 8 Waste (Muda) — Operasyonel Israf
+```
+T - Transport:    Gereksiz malzeme hareketi
+I - Inventory:    Fazla stok tutma
+M - Motion:       Gereksiz personel hareketi
+W - Waiting:      Bekleme suresi (onay, malzeme, sistem)
+O - Over-processing: Gerekenden fazla islem
+O - Over-production: Gerekenden fazla uretim/hazirlik
+D - Defects:      Hata, yeniden islem, iade
+S - Skills unused: Calisanlarin potansiyelini kullanmama
+```
+
+## Value Stream Mapping (VSM)
+```
+Mevcut Durum Haritasi:
+├── Her adim icin: Cycle Time, Wait Time, Value-Added?
+├── Toplam Lead Time = Cycle + Wait
+├── VA Ratio = Value-Added Time / Lead Time
+├── Hedef: VA Ratio > %25
+
+Gelecek Durum Haritasi:
+├── Wait time'lari ortadan kaldir/azalt
+├── Paralellestirilebilecek adimlari tespit et
+├── Otomasyon firsatlarini belirle
+├── Kaizen olaylari planla
+```
+
+## KPI Tanimlama Sablonu
+```markdown
+| KPI | Tanim | Formul | Hedef | Olcum Sikligi | Kaynak |
+|-----|-------|--------|-------|---------------|--------|
+| [Ad] | [Aciklama] | [Hesaplama] | [Hedef deger] | [Gunluk/Haftalik/Aylik] | [Sistem/Rapor] |
+```
+
+## Karar Agaci Sablonu
+```markdown
+# Karar Agaci: {Konu}
+
+## Soru 1: [Baslangic sorusu]
+├── EVET -> [Sonraki soru veya eylem]
+└── HAYIR -> [Sonraki soru veya eylem]
+    ├── Durum A -> [Eylem A]
+    └── Durum B -> [Eylem B]
+```
+
+## Egitim Dokumani Sablonu
+```markdown
+# Egitim: {Konu}
+**Sure:** [X dakika] | **Seviye:** [Baslangic/Orta/Ileri] | **Hedef Kitle:** [Rol]
+
+## Ogrenme Hedefleri
+Bu egitim sonunda katilimci:
+1. [...] yapabilir
+2. [...] aciklayabilir
+
+## Icerik
+### Modul 1: [Baslik]
+- **Teori:** [Kisa aciklama]
+- **Uygulama:** [Adim adim yapilacaklar]
+- **Kontrol Sorusu:** [Anlama testi]
+
+## Degerlendirme
+[Kirkpatrick Model:]
+├── Level 1 - Reaction: Katilimci memnuniyeti anketi
+├── Level 2 - Learning: Bilgi testi (pre/post)
+├── Level 3 - Behavior: Is basinda gozlem (30 gun sonra)
+├── Level 4 - Results: KPI degisimi (90 gun sonra)
+```
+
+## RACI for SOPs
+```
+Her SOP icin:
+├── Hazirlayan (R): Surec Uzmani + ilgili teknik agent
+├── Onaylayan (A): Kullanici (proje sahibi)
+├── Inceleyen (C): QA + Security (gerekirse)
+├── Bilgilendirilen (I): Tum agentlar
+```
+
+## Anti-Pattern'ler
+| Anti-Pattern | Dogru Yaklasim |
+|---|---|
+| Novel SOP (sayfalarca metin) | Kisa, adim adim, gorsel destekli |
+| Guncel olmayan dokuman | Versiyon kontrol + review takvimi |
+| Tek formatta egitim | Video + metin + uygulama (multimodal) |
+| KPI olmadan surec | Her surec olculebilir olmali |
+| BPMN olmadan is akisi | BPMN 2.0 ile standart gorsellestirme |
+| Jargon dolu dokuman | Sade, anlasilir dil |

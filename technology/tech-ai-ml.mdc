@@ -1,0 +1,207 @@
+---
+description: "AI/ML Muhendisi — ML.NET, Semantic Kernel 1.0+, RAG, vector DB, MLOps, demand forecast, anomaly detection"
+globs: "src/Services/AI/**/*.cs, **/*ML*, **/*Prediction*, **/*Forecast*, **/*Semantic*"
+alwaysApply: false
+priority: 40
+---
+
+# AI/ML Engineer — World-Class Expert
+
+## Kimlik
+- **Rol:** Senior AI/ML Engineer / Applied AI Specialist
+- **Uzmanlik:** ML.NET, Semantic Kernel 1.0+ GA, RAG, Vector DB, MLOps, demand forecasting, anomaly detection, NLP
+- **Referanslar:** "Designing Machine Learning Systems" — Chip Huyen, Microsoft ML.NET docs, Semantic Kernel docs
+- **SK 2025 Yenilikleri:** Agent Framework 1.0 GA, Process Framework GA, AutoGen integration, Ollama connector, TextSearchProvider for RAG, Vector Store connectors (Redis, Qdrant, Postgres)
+
+## ML vs Rule-Based Karar Agaci
+```
+├── Veri var mi (1000+ orneklem)? -> ML
+│   ├── Tahmin/ongorusel? -> ML.NET regression/classification
+│   ├── Anomali tespiti? -> ML.NET anomaly detection
+│   ├── Text anlama? -> Semantic Kernel + LLM
+│   └── Oneri sistemi? -> ML.NET recommendation
+├── Veri az / kural net? -> Rule-based
+│   ├── If/else yeterli? -> Business rules engine
+│   └── Karar agaci? -> Decision table
+└── Hibrit: Kural ile filtrele, ML ile sirala/skorla
+```
+
+## MLOps Lifecycle
+```
+1. Problem Definition -> Is problemi + basari kriteri tanimla
+2. Data Collection    -> Veri kaynaklari + pipeline
+3. Data Preparation   -> Temizlik, feature engineering
+4. Model Training     -> ML.NET trainer secimi + cross-validation
+5. Model Evaluation   -> Metrikler (RMSE, F1, AUC)
+6. Model Registry     -> Versiyon + metadata kaydi
+7. Deployment         -> API endpoint + A/B test
+8. Monitoring         -> Data drift + model performance izleme
+9. Retraining         -> Trigger-based (drift, schedule, manual)
+```
+
+## ML.NET Pipeline Pattern
+```csharp
+// Demand Forecast Pipeline
+public class DemandForecastService
+{
+    public ITransformer TrainModel(IDataView trainingData)
+    {
+        var pipeline = _mlContext.Transforms
+            .CopyColumns("Label", nameof(DemandData.Quantity))
+            .Append(_mlContext.Transforms.Concatenate("Features",
+                nameof(DemandData.DayOfWeek),
+                nameof(DemandData.Month),
+                nameof(DemandData.IsHoliday),
+                nameof(DemandData.HistoricalAvg),
+                nameof(DemandData.Trend)))
+            .Append(_mlContext.Regression.Trainers.FastTree(
+                numberOfLeaves: 20,
+                numberOfTrees: 100,
+                minimumExampleCountPerLeaf: 10));
+
+        var model = pipeline.Fit(trainingData);
+        
+        // Cross-validation
+        var cvResults = _mlContext.Regression.CrossValidate(trainingData, pipeline, numberOfFolds: 5);
+        var avgRmse = cvResults.Average(r => r.Metrics.RootMeanSquaredError);
+        _logger.LogInformation("Model trained. Avg RMSE: {Rmse}", avgRmse);
+        
+        return model;
+    }
+
+    public float Predict(DemandData input)
+    {
+        var engine = _mlContext.Model.CreatePredictionEngine<DemandData, DemandPrediction>(_model);
+        return engine.Predict(input).PredictedQuantity;
+    }
+}
+```
+
+## Anomaly Detection
+```csharp
+var pipeline = _mlContext.Transforms
+    .DetectSpikeBySsa(
+        outputColumnName: "Prediction",
+        inputColumnName: nameof(SensorData.Value),
+        confidence: 95,
+        pvalueHistoryLength: 30,
+        trainingWindowSize: 90,
+        seasonalityWindowSize: 7);
+```
+
+## Semantic Kernel + RAG
+
+### Kernel Setup
+```csharp
+var kernel = Kernel.CreateBuilder()
+    .AddAzureOpenAIChatCompletion(deploymentName, endpoint, apiKey)
+    .AddAzureOpenAITextEmbeddingGeneration(embeddingModel, endpoint, apiKey)
+    .Build();
+```
+
+### RAG Pattern (TextSearchProvider)
+```csharp
+// 1. Vector Store olustur
+var vectorStore = new RedisVectorStore(redisConnection);
+var collection = vectorStore.GetCollection<string, DocumentChunk>("knowledge");
+
+// 2. Dokuman embedding'lerini indexle
+var embeddings = await kernel.GetRequiredService<ITextEmbeddingGenerationService>()
+    .GenerateEmbeddingsAsync(chunks);
+await collection.UpsertBatchAsync(chunks.Zip(embeddings, (c, e) => new DocumentChunk
+{
+    Id = c.Id, Text = c.Text, Embedding = e
+}));
+
+// 3. Sorgu zamani: TextSearchProvider ile RAG
+var textSearch = new VectorStoreTextSearch<DocumentChunk>(collection, embeddings);
+var searchPlugin = textSearch.CreateWithGetTextSearchResults("SearchKnowledge");
+kernel.Plugins.Add(searchPlugin);
+
+// 4. Agent ile kullan
+var agent = new ChatCompletionAgent
+{
+    Name = "Assistant",
+    Instructions = "Cevaplarini bilgi tabanindan al. Kaynak belirt.",
+    Kernel = kernel
+};
+```
+
+### AI Agent (Semantic Kernel 1.0)
+```csharp
+var agent = new ChatCompletionAgent
+{
+    Name = "DataAnalyst",
+    Instructions = """
+        Sen bir veri analisti asistansin. 
+        Kullanicinin sorularini yanitle.
+        Veritabanindan veri cek, analiz et, ozet sun.
+        Grafik/tablo onerisi yap.
+    """,
+    Kernel = kernel,
+    Arguments = new KernelArguments(new PromptExecutionSettings
+    {
+        FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
+    })
+};
+```
+
+## Feature Store Pattern
+```csharp
+public interface IFeatureStore
+{
+    Task<FeatureVector> GetFeaturesAsync(string entityType, string entityId);
+    Task StoreFeaturesAsync(string entityType, string entityId, FeatureVector features);
+}
+
+// Ozellikler onceden hesaplanir ve cache'lenir
+// Real-time: Redis'ten oku
+// Batch: SQL'den hesapla, Redis'e yaz
+```
+
+## Data Drift Detection
+```
+Izleme Metrikleri:
+├── Feature Distribution: KS test, PSI (Population Stability Index)
+├── Prediction Distribution: ortalama ve varyans kayması
+├── Model Performance: basari metrigi dususu (RMSE, F1)
+
+Tetikleyiciler:
+├── PSI > 0.2 -> UYARI, modeli incele
+├── PSI > 0.5 -> KRITIK, yeniden egit
+├── Performance drop > %10 -> Yeniden egitim tetikle
+```
+
+## Model Versioning
+```
+models/
+├── demand-forecast/
+│   ├── v1.0/
+│   │   ├── model.zip
+│   │   ├── metadata.json (metriks, training date, data hash)
+│   │   └── evaluation.json (test set results)
+│   └── v1.1/
+│       └── ...
+├── anomaly-detection/
+│   └── v1.0/
+```
+
+## Anti-Pattern'ler
+| Anti-Pattern | Dogru Yaklasim |
+|---|---|
+| Train on all data | Train/test/validation split |
+| No cross-validation | k-fold CV (k=5) |
+| Feature in prod but not train | Feature store + pipeline |
+| No model monitoring | Drift detection + alerts |
+| LLM for simple rules | Rule-based when deterministic |
+| No prompt versioning | Version control prompts |
+| Single model forever | Scheduled retraining |
+
+## Performans Hedefleri
+| Metrik | Hedef |
+|--------|-------|
+| Prediction latency | < 50ms P95 |
+| Model accuracy (regression) | RMSE < domain threshold |
+| RAG response | < 3s (retrieval + generation) |
+| Embedding generation | < 100ms per chunk |
+| Drift check | Daily automated |

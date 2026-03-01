@@ -1,0 +1,160 @@
+---
+description: "WMS Domain — Is akislari, edge case'ler, surec detaylari"
+globs: 
+alwaysApply: false
+priority: 60
+---
+
+# WMS Surec Akislari ve Edge Cases
+
+## 1. Mal Kabul (Receiving)
+```
+ASN geldi -> Dock atama -> Arac yaklasti -> Indirme basladi
+-> Barkod tarama (GTIN/SSCC) -> Miktar kontrol (ASN vs gercek)
+-> Kalite kontrol (gerekirse) -> Putaway gorev olustur
+-> Rafa yerlestirme -> Stok guncelle -> Tamamlandi
+```
+
+### Edge Cases — Receiving
+1. ASN'siz teslimat -> Manuel kabul modu, supervisor onayi
+2. Miktar farki (fazla) -> Fazla miktar ayrı alan, tedarikçiye bildir
+3. Miktar farki (eksik) -> Partial receive, purchasing'e bildir
+4. Hasarli urun -> Quarantine konumuna yonlendir, foto cek
+5. Yanlis urun -> Reject, tedarikçiye iade sureci baslat
+6. Lot/seri eksik -> Kabul DURDUR, bilgi tamamlanmadan devam etme
+7. Expired urun geldi -> Otomatik reject, FEFO violation uyarisi
+8. Dock dolu -> Kuyruk sistemi, tahmini bekleme suresi goster
+9. Sistemde tanimli olmayan urun -> Yeni urun tanimlama akisi tetikle
+10. Catch weight farki -> Tolerans dahilinde kabul (%2), disinda supervisor onay
+
+## 2. Yerlestirme (Putaway)
+```
+Mal kabul tamamlandi -> Putaway gorevi olustur
+-> Sistem uygun konum oner (putaway rule engine)
+-> Operator konuma gider -> Barkod ile konum dogrula
+-> Urunu yerlestir -> Barkod ile urun dogrula
+-> Miktar onayla -> Stok guncelle -> Gorev tamamlandi
+```
+
+### Putaway Rule Engine
+```
+Oncelik sirasi:
+1. Ayni urun zaten var olan konum (consolidation)
+2. Zone kurali (soguk urun -> soguk zone)
+3. ABC sinifi (A -> pick face, C -> bulk)
+4. Agirlik/boyut uygunlugu (konum kapasitesi)
+5. En yakin bos konum (yurume mesafesi minimize)
+```
+
+## 3. Toplama (Picking)
+```
+Siparis onaylandi -> Wave olustur (batch grouping)
+-> Pick list olustur (route optimize)
+-> Operatora gorev ata -> Operator konuma gider
+-> Barkod ile konum dogrula -> Urun tarama
+-> Miktar onayla -> Sonraki konuma git -> ... -> Toplama bitti
+-> Staging alanina birak -> Packing'e devir
+```
+
+### Pick Stratejileri
+```
+├── Discrete: Her siparis tek tek (kucuk hacim)
+├── Batch: Birden fazla siparis ayni anda (orta hacim)
+├── Wave: Dalga bazli, zaman dilimine gore (yuksek hacim)
+├── Zone: Her operator kendi zone'unda toplar (buyuk depo)
+├── Cluster: Birden fazla siparis ayni arabada (e-commerce)
+```
+
+### Edge Cases — Picking
+1. Stok bulunamadi (lokasyonda yok) -> Cycle count tetikle, alternatif konum oner
+2. Short pick (yetersiz stok) -> Partial pick + backorder + bildirim
+3. Expired urun rafta -> Skip, quarantine gorev olustur
+4. Hasarli urun -> Damage report, alternatif stok
+5. Yanlis urun taratildi -> Hata sesi + ekran uyarisi, dogru urun iste
+6. Operator mola verdi -> Gorev pause, baska operatora ata
+7. Yuksek oncelikli siparis geldi -> Wave interleaving, oncelik degistir
+8. Ayni urun birden fazla konumda -> FIFO/FEFO'ya gore sec, en yakin once
+9. Konum barkodu okunamiyor -> Manuel konum girisi + bakim bildirimi
+10. Batch icinde iptal siparis -> Siparisi wave'den cikar, stoku geri yukle
+
+## 4. Paketleme (Packing)
+```
+Pick tamamlandi -> Staging'e geldi -> Packing istasyonu atama
+-> Urunleri tara (pick list dogrulama) -> Kutu sec (boyut optimizasyonu)
+-> Paketleme -> Etiket bas -> Agirlik kontrol (tartı)
+-> Koli kapatma -> Shipping alanina tasi
+```
+
+### Edge Cases — Packing
+1. Urun hasar gormüs (toplama sirasinda) -> Damage report, replacement pick
+2. Yanlis urun geldi (pick hatasi) -> Red, picker'a geri gonder
+3. Birden fazla koli gereken siparis -> Multi-parcel, her koliye etiket
+4. Gift wrapping / VAS istegi -> Ekstra adim, ozel malzeme
+
+## 5. Sevkiyat (Shipping)
+```
+Paketleme bitti -> Carrier atama (kargo firmasi)
+-> BOL (tasima belgesi) olustur -> Dock atama
+-> Yukleme sirasi -> Arac yukleme (scan ile dogrula)
+-> Agirlik/adet final kontrol -> Cikis onayi
+-> Carrier handoff -> Tracking number -> Musteriye bildirim
+```
+
+### Edge Cases — Shipping
+1. Carrier gelme gecikmesi -> Alternatif carrier, müsteri bildirim
+2. Arac kapasitesi yetersiz -> Split shipment, ikinci arac talep
+3. Yanlis dock'a yonlendirme -> Dock reassign, operator bildirim
+4. Son dakika siparis iptali -> Unload, stok geri yükle
+
+## 6. Stok Sayim (Cycle Count)
+```
+Sayim plani olustur (ABC bazli) -> Konum sec
+-> Operatora gorev ata -> Konum tarama
+-> Fiziksel sayim -> Sistem ile karsilastirma
+-> Varyans var mi? -> Evet: ikinci sayim -> Hala varyans? -> Adjustment (onaylu)
+                   -> Hayir: Onayla, tamamla
+```
+
+### Sayim Kurallari
+```
+├── A items: Ayda 1 sayim
+├── B items: Ceyrekde 1 sayim
+├── C items: Yilda 1-2 sayim
+├── Varyans threshold: %2 (otomatik onay)
+├── Varyans > %2: Supervisor onay ZORUNLU
+├── Varyans > %5: Ikinci sayim ZORUNLU
+├── Full inventory count: Yilda 1 (genelde yil sonu)
+```
+
+## 7. Iade Yonetimi (Returns)
+```
+Iade talebi -> RMA numarasi olustur -> Urun depoya geldi
+-> Inceleme (kalite kontrol) -> Karar:
+   -> Stoka geri yukle (hasarsiz)
+   -> Tamir/yenileme (onarılabilir)
+   -> Hurda (kullanilamaz)
+-> Stok guncelle -> Musteriye bildirim (refund/replacement)
+```
+
+## 8. Crossdocking
+```
+ASN geldi (crossdock flag) -> Direkt sevkiyat dock'a yonlendir
+-> Indirme -> Sorting (siparis bazli ayirma)
+-> Direkt yukleme (depolama YOK) -> Sevkiyat
+```
+- Amac: Dock-to-stock süresini sifira indirmek
+- Kosul: Outbound siparis zaten hazir olmali
+
+## Slotting Optimizasyonu
+```
+ABC Analizi:
+├── A (yuksek hareket): Pick face, kolay erisim, alt raflar
+├── B (orta hareket): Orta katlar
+├── C (dusuk hareket): Ust katlar, bulk alani
+
+Ek Kriterler:
+├── Agir urunler: Alt seviye (ergonomi)
+├── Sik birlikte toplananlar: Yakin konumlara
+├── Mevsimsel urunler: Donem basında one tasi
+├── Boyut uyumu: Kuçuk urun kucuk raf
+```

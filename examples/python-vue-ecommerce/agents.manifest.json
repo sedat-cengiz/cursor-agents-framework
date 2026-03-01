@@ -1,0 +1,61 @@
+{
+  "$schema": "../../agents.manifest.schema.json",
+  "frameworkVersion": "3.0.0",
+  "projectName": "ShopPro",
+  "platform": "Multi-vendor E-Commerce Platform",
+  "architecturePhilosophy": "Make it work, make it right, make it fast.",
+  "language": {
+    "communication": "en",
+    "code": "en",
+    "docs": "en",
+    "commits": "en"
+  },
+  "layers": {
+    "technology": [
+      "python",
+      "devops",
+      "security",
+      "testing"
+    ],
+    "domain": [
+      "ecommerce"
+    ]
+  },
+  "technologyStack": {
+    "backend": "Python 3.12, FastAPI 0.115+, SQLAlchemy 2.x, Pydantic v2, Celery",
+    "frontend": "Vue 3 + TypeScript 5.x + Vite 6, PrimeVue, Pinia, TanStack Query",
+    "database": "PostgreSQL 16 (multi-tenant: schema-per-tenant)",
+    "cache": "Redis 7+",
+    "messageBroker": "RabbitMQ + Celery",
+    "auth": "OAuth2 + JWT (python-jose)",
+    "test": "pytest, httpx, Playwright, Vitest",
+    "observability": "structlog + Grafana + OpenTelemetry"
+  },
+  "aliases": {
+    "sef": "orchestrator",
+    "backend": "tech-python",
+    "frontend": "tech-vue",
+    "devops": "tech-devops",
+    "guvenlik": "tech-security",
+    "qa": "tech-testing",
+    "review": "code-quality",
+    "mimari": "process-architecture",
+    "analist": "process-analysis"
+  },
+  "performanceTargets": {
+    "apiResponseP50Ms": 150,
+    "apiResponseP95Ms": 400,
+    "apiListP50Ms": 250,
+    "apiListP95Ms": 700,
+    "dbQueryP95Ms": 80,
+    "frontendFcpSec": 2.0,
+    "frontendBundleKb": 400
+  },
+  "sprintConfig": {
+    "durationDays": 14,
+    "capacityPercent": 80,
+    "techDebtPercent": 10,
+    "bufferPercent": 10,
+    "pointScale": "fibonacci"
+  }
+}
