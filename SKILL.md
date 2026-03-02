@@ -21,6 +21,12 @@ Layer 2: TECHNOLOGY (pick what you need)
 ├── tech-dotnet.mdc           (priority: 40, .NET 9, EF Core, CQRS, async)
 ├── tech-react.mdc            (priority: 40, React 19, TanStack, Zustand)
 ├── tech-python.mdc           (priority: 40, Python 3.12+, FastAPI, SQLAlchemy)
+├── tech-java.mdc             (priority: 40, Java 21+, Spring Boot 3, JPA)
+├── tech-go.mdc               (priority: 40, Go 1.22+, chi/gin, sqlx/pgx)
+├── tech-angular.mdc          (priority: 40, Angular 17+, Signals, NgRx)
+├── tech-vue.mdc              (priority: 40, Vue 3.4+, Pinia, Composition API)
+├── tech-nextjs.mdc           (priority: 40, Next.js 14+, App Router, RSC)
+├── tech-flutter.mdc          (priority: 40, Flutter 3.22+, Riverpod, GoRouter)
 ├── tech-sql-server.mdc       (priority: 40, SQL Server, indexing, multi-tenancy)
 ├── tech-maui.mdc             (priority: 40, .NET MAUI 9, Blazor Hybrid, offline)
 ├── tech-ai-ml.mdc            (priority: 40, ML.NET, Semantic Kernel, RAG)
@@ -52,21 +58,23 @@ Layer 5: LEARNING (always installed)
 
 After installation, agents can be invoked via short aliases in Cursor chat:
 
-| Alias | Maps To | Role |
-|-------|---------|------|
-| **@sef** | orchestrator.mdc | Project Manager — start here |
-| @backend | tech-dotnet.mdc (or project's backend tech) | Backend developer |
-| @frontend | tech-react.mdc (or project's frontend tech) | Frontend developer |
-| @qa | tech-testing.mdc | QA / Test engineer |
-| @db | tech-sql-server.mdc | Database architect |
-| @guvenlik | tech-security.mdc | Security specialist |
-| @devops | tech-devops.mdc | DevOps / SRE |
-| @mobil | tech-maui.mdc | Mobile developer |
-| @ai | tech-ai-ml.mdc | AI/ML engineer |
-| @review | code-quality.mdc | Code reviewer |
-| @mimari | process-architecture.mdc | Solution architect |
-| @analist | process-analysis.mdc | Business analyst |
-| @dokumantasyon | process-documentation.mdc | Process documentation |
+| Turkish | English | Maps To | Role |
+|---------|---------|---------|------|
+| **@sef** | **@pm** | orchestrator.mdc | Project Manager — start here |
+| @backend | @backend | tech-dotnet.mdc (or project's backend tech) | Backend developer |
+| @frontend | @frontend | tech-react.mdc (or project's frontend tech) | Frontend developer |
+| @qa | @qa | tech-testing.mdc | QA / Test engineer |
+| @db | @db | tech-sql-server.mdc | Database architect |
+| @guvenlik | @security | tech-security.mdc | Security specialist |
+| @devops | @devops | tech-devops.mdc | DevOps / SRE |
+| @mobil | @mobile | tech-maui.mdc | Mobile developer |
+| @ai | @ai | tech-ai-ml.mdc | AI/ML engineer |
+| @review | @review | code-quality.mdc | Code reviewer |
+| @mimari | @architect | process-architecture.mdc | Solution architect |
+| @analist | @analyst | process-analysis.mdc | Business analyst |
+| @dokumantasyon | @docs | process-documentation.mdc | Process documentation |
+
+Set `"aliasLanguage": "en"` or `"both"` in `agents.manifest.json` to control which set is installed.
 
 ## Quick Start — New Project Setup
 

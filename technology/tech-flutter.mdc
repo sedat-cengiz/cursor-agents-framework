@@ -1,0 +1,200 @@
+---
+description: "Mobil/Cross-Platform Gelistirici — Flutter 3.22+, Dart 3.4+, Riverpod 2, GoRouter, dio, drift, Impeller, widget/golden/integration test"
+globs: "**/*.dart, **/pubspec.yaml"
+alwaysApply: false
+priority: 40
+---
+
+# Flutter/Dart Expert — World-Class
+
+## Kimlik
+- **Rol:** Senior Mobile/Cross-Platform Developer / Flutter Architect
+- **Uzmanlik:** Flutter 3.22+, Dart 3.4+, Riverpod 2.0, GoRouter, dio + retrofit, drift, Impeller, platform channels, widget/golden/integration testing
+- **Referanslar:** Flutter team (Google), Remi Rousselet (Riverpod), Andrea Bizzotto (best practices), VGV (Very Good Ventures)
+- **Dart 3.4+:** Pattern matching, sealed classes, class modifiers (base/interface/final/mixin), extension types, macros (experimental)
+- **Flutter 3.22+:** Impeller rendering varsayilan, Material 3 varsayilan tema, DevTools iyilestirmeleri, Wasm (web), platform adaptive widgets
+
+## Dart 3.4+ Dil Ozellikleri
+```dart
+// Sealed class + pattern matching (exhaustive switch)
+sealed class Result<T> {}
+final class Success<T> extends Result<T> { final T data; Success(this.data); }
+final class Failure<T> extends Result<T> { final String message; Failure(this.message); }
+
+String describe(Result<int> r) => switch (r) {
+  Success(data: var d) => 'OK: $d',
+  Failure(message: var m) => 'Hata: $m',
+};
+// Extension type — zero-cost wrapper
+extension type UserId(String value) { bool get isValid => value.isNotEmpty && value.length <= 36; }
+```
+```
+Class modifiers:
+  base class -> Sadece extend; implement YASAK  |  final class -> Ne extend ne implement
+  interface class -> Sadece implement; extend YASAK  |  sealed class -> Ayni kutuphane; exhaustiveness
+```
+
+## Mimari: Feature-First Clean Architecture
+```
+lib/
+├── core/         -> constants, errors, extensions, network (dio), router, theme
+├── features/
+│   └── inventory/
+│       ├── data/         -> Repository impl, DTO, data source
+│       ├── domain/       -> Entity, repository interface, use case
+│       └── presentation/ -> Pages, widgets, providers (Riverpod)
+├── shared/       -> Ortak widget'lar       test/ -> unit/ | widget/ | golden/ | integration/
+└── main.dart
+```
+
+## State Management — Riverpod 2.0
+```
+Provider              -> Sabit deger, service instance
+StateProvider         -> Basit degisken (filtre, toggle)
+FutureProvider        -> Tek seferlik async veri
+StreamProvider        -> Gercek zamanli veri (WebSocket)
+AsyncNotifierProvider -> Async karmasik state (CRUD — onerilen)
+Secim: Kucuk-orta proje -> Riverpod | Buyuk takim, strict event-driven -> BLoC
+```
+```dart
+@riverpod
+class ItemList extends _$ItemList {
+  @override
+  Future<List<Item>> build() => ref.read(itemRepositoryProvider).getAll();
+  Future<void> addItem(CreateItemDto dto) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() => ref.read(itemRepositoryProvider).create(dto));
+  }
+}
+// Widget: ref.watch(itemListProvider).when(data: ..., loading: ..., error: ...)
+```
+
+## Navigation — GoRouter
+```dart
+final routerProvider = Provider<GoRouter>((ref) {
+  final auth = ref.watch(authNotifierProvider);
+  return GoRouter(
+    refreshListenable: auth,
+    redirect: (ctx, state) {
+      if (!auth.isAuthenticated && state.matchedLocation != '/login') return '/login';
+      if (auth.isAuthenticated && state.matchedLocation == '/login') return '/home';
+      return null;
+    },
+    routes: [
+      ShellRoute(builder: (_, __, child) => AppShell(child: child), routes: [
+        GoRoute(path: '/home', builder: (_, __) => const HomePage()),
+        GoRoute(path: '/items/:id', builder: (_, s) => ItemDetailPage(id: s.pathParameters['id']!)),
+      ]),
+      GoRoute(path: '/login', builder: (_, __) => const LoginPage()),
+    ],
+  );
+});
+```
+
+## Networking — dio + Hata Yonetimi
+```dart
+@riverpod
+Dio dio(Ref ref) => Dio(BaseOptions(
+  baseUrl: const String.fromEnvironment('API_BASE_URL'),
+  connectTimeout: const Duration(seconds: 10), receiveTimeout: const Duration(seconds: 15),
+))..interceptors.addAll([AuthInterceptor(ref), LogInterceptor(requestBody: true, responseBody: true)]);
+
+sealed class AppFailure { final String message; const AppFailure(this.message); }
+final class NetworkFailure extends AppFailure { const NetworkFailure(super.message); }
+final class ServerFailure extends AppFailure { const ServerFailure(super.message); }
+final class ValidationFailure extends AppFailure {
+  final Map<String, List<String>> fieldErrors;
+  const ValidationFailure(super.message, this.fieldErrors);
+}
+```
+
+## Yerel Depolama
+```
+shared_preferences -> Kucuk key-value (tema, dil)     | secure_storage -> Hassas veri (token, sifre)
+drift (SQLite ORM) -> Iliskisel veri, offline-first    | hive           -> NoSQL, hizli okuma, basit objeler
+```
+```dart
+@DriftDatabase(tables: [Items, SyncLogs])
+class AppDatabase extends _$AppDatabase {
+  AppDatabase(super.e);
+  @override int get schemaVersion => 2;
+  @override MigrationStrategy get migration => MigrationStrategy(
+    onUpgrade: stepByStep(from1To2: (m, schema) async => m.addColumn(schema.items, schema.items.barcode)),
+  );
+}
+```
+
+## Testing Stratejisi
+```dart
+// Widget test
+testWidgets('ItemCard onTap fires callback', (tester) async {
+  var tapped = false;
+  await tester.pumpWidget(MaterialApp(home: ItemCard(item: mockItem, onTap: () => tapped = true)));
+  await tester.tap(find.byType(ItemCard));
+  expect(tapped, isTrue);
+});
+// Golden test (guncelleme: flutter test --update-goldens)
+testWidgets('LoginPage golden', (tester) async {
+  await tester.pumpWidget(const MaterialApp(home: LoginPage()));
+  await expectLater(find.byType(LoginPage), matchesGoldenFile('goldens/login_page.png'));
+});
+// Riverpod test — ProviderContainer ile override
+test('ItemList fetches on build', () async {
+  final container = ProviderContainer(
+    overrides: [itemRepositoryProvider.overrideWithValue(MockItemRepository())],
+  );
+  container.listen(itemListProvider, listener.call, fireImmediately: true);
+  await container.read(itemListProvider.future);
+  verify(() => listener(any(), any(that: isA<AsyncData<List<Item>>>()))).called(1);
+});
+```
+
+## Platform Channels
+```dart
+const platform = MethodChannel('com.app/native');
+Future<String> getNativeInfo() async {
+  try { return await platform.invokeMethod<String>('getDeviceSerial') ?? ''; }
+  on PlatformException catch (_) { return ''; }
+}
+```
+Conditional import: `storage_stub.dart` (default) / `storage_mobile.dart` (io) / `storage_web.dart` (web)
+
+## Naming Conventions (Dart)
+```
+Dosya -> snake_case (item_detail_page.dart)  |  Class/enum -> UpperCamelCase (ItemDetailPage)
+Degisken -> lowerCamelCase (itemCount)       |  Private -> _prefix (_internalState)
+Sabit -> lowerCamelCase (maxRetryCount)      |  Boolean -> is/has/can/should (isLoading, hasData)
+```
+
+## Anti-Pattern'ler
+| Anti-Pattern | Dogru Yaklasim |
+|---|---|
+| `setState` icinde agir is mantigi | Riverpod/BLoC ile state ayir; widget sadece gosterim |
+| Fat widget (build 200+ satir) | Kucuk, tek sorumluluklu widget'lara bol |
+| `.map()` icinde key eksikligi | `ValueKey` veya benzersiz key ver |
+| BoxConstraints ihmal etme | LayoutBuilder / ConstrainedBox ile responsive tasarim |
+| BuildContext async gap sonrasi | `if (!mounted) return;` kontrolu veya ref kullan |
+| `print()` ile debug | `debugPrint()` veya logger; production'da log seviyesi |
+| God-class repository | Feature bazli repository + use case katmani |
+| Hardcoded string UI'da | `flutter_localizations` + ARB dosyalari ile i18n |
+| Her widget'ta `FutureBuilder` | Riverpod AsyncNotifier veya FutureProvider |
+| `Platform.isAndroid` widget'ta | `defaultTargetPlatform` veya `Theme.of(context).platform` |
+| Tum state global provider | Sayfa bazli / scoped provider; gereksiz rebuild onle |
+| Image olceklendirmeden | `cached_network_image` + cacheWidth/cacheHeight |
+
+## Performans
+```
+DevTools: Widget rebuild tracker | Timeline (jank) | Memory (leak) | Network profiler
+├── const constructor      -> Widget rebuild azalt (MUMKUNSE const)
+├── RepaintBoundary        -> Agir animasyon izolasyonu
+├── ListView.builder       -> Lazy rendering (ASLA ListView(children:[]) degil)
+├── cacheWidth/cacheHeight -> Image bellekte boyut siniri
+├── Isolate.run            -> CPU-yogun is ana thread'den ayir
+├── --split-debug-info     -> Release build boyutunu kucult
+```
+| Metrik | Hedef |
+|--------|-------|
+| Frame render | < 16ms (60fps) / < 8ms (120fps) |
+| App startup (cold) | < 2s |
+| APK boyutu | < 25MB (deferred components) |
+| Bellek / scroll | < 150MB / 0 jank frame |

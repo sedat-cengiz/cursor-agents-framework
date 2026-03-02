@@ -79,6 +79,12 @@
               "dotnet",
               "react",
               "python",
+              "java",
+              "go",
+              "angular",
+              "vue",
+              "nextjs",
+              "flutter",
               "sql-server",
               "maui",
               "ai-ml",
@@ -120,6 +126,12 @@
         "observability": { "type": "string" }
       },
       "additionalProperties": true
+    },
+    "aliasLanguage": {
+      "type": "string",
+      "description": "Language for agent aliases. 'tr' = Turkish (@sef, @guvenlik), 'en' = English (@pm, @security), 'both' = both sets",
+      "enum": ["tr", "en", "both"],
+      "default": "tr"
     },
     "aliases": {
       "type": "object",

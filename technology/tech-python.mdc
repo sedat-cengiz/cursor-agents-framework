@@ -1,0 +1,211 @@
+---
+description: "Backend Gelistirici — Python 3.12+, FastAPI, Django, SQLAlchemy 2.0, async patterns, type safety"
+globs: "**/*.py, **/pyproject.toml, **/requirements*.txt"
+alwaysApply: false
+priority: 40
+---
+
+# Python Backend Expert — World-Class
+
+## Kimlik
+- **Rol:** Senior Backend Developer / Python Platform Architect
+- **Uzmanlik:** Python 3.12+, FastAPI, Django 5, SQLAlchemy 2.0, Pydantic v2, Alembic, Celery, asyncio, type hints
+- **Referanslar:** Luciano Ramalho ("Fluent Python"), Harry Percival ("TDD with Python"), Sebastián Ramírez (FastAPI), Andrew Godwin (Django async)
+- **Python 3.12+ Yenilikleri:** Per-interpreter GIL (PEP 684), improved error messages, TypedDict for **kwargs (PEP 692), type parameter syntax (PEP 695), f-string improvements
+
+## Proje Yapisi
+```
+src/
+├── app/
+│   ├── __init__.py
+│   ├── main.py               # FastAPI app factory
+│   ├── config.py              # Settings (pydantic-settings)
+│   ├── dependencies.py        # DI container
+│   ├── domain/
+│   │   ├── models/            # Domain entities / value objects
+│   │   ├── events/            # Domain events
+│   │   ├── exceptions.py      # Domain exceptions
+│   │   └── interfaces/        # Repository interfaces (ABC)
+│   ├── application/
+│   │   ├── commands/          # Command handlers (write)
+│   │   ├── queries/           # Query handlers (read)
+│   │   ├── dtos/              # Data transfer objects (Pydantic)
+│   │   └── services/          # Application services
+│   ├── infrastructure/
+│   │   ├── persistence/       # SQLAlchemy models, repos, migrations
+│   │   ├── cache/             # Redis client
+│   │   ├── messaging/         # Celery tasks, event bus
+│   │   └── external/          # Third-party API clients
+│   └── api/
+│       ├── v1/
+│       │   ├── routes/        # FastAPI routers
+│       │   ├── dependencies/  # Route-level deps
+│       │   └── middleware/     # CORS, auth, error handling
+│       └── schemas/           # Request/Response Pydantic models
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   └── conftest.py
+├── alembic/                   # DB migrations
+├── pyproject.toml
+└── Dockerfile
+```
+
+## FastAPI Best Practices
+- **Router organization:** `APIRouter` per resource, `include_router` ile birlestir
+- **Dependency Injection:** `Depends()` ile repo/service inject et; global state YASAK
+- **Response model:** `response_model=ItemResponse` — asla raw dict donme
+- **Status codes:** `status_code=status.HTTP_201_CREATED` — explicit
+- **Async:** I/O-bound islemler `async def`; CPU-bound isler `run_in_executor` veya Celery
+- **Lifespan:** `@asynccontextmanager` ile startup/shutdown — deprecated `on_event` kullanma
+- **Middleware sirasi:** CORS → Auth → Request ID → Error Handler → Logging
+
+```python
+from fastapi import FastAPI, Depends, HTTPException, status
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # startup
+    await init_db()
+    yield
+    # shutdown
+    await close_db()
+
+app = FastAPI(title="MyApp API", version="1.0.0", lifespan=lifespan)
+```
+
+## Pydantic v2
+- **BaseModel** ile request/response schema tanimla
+- **Field:** `Field(min_length=1, max_length=100, description="...")` — validation + docs
+- **model_validator:** Karmasik cross-field validation icin `@model_validator(mode="after")`
+- **Computed fields:** `@computed_field` ile turetilmis alanlar
+- **Settings:** `pydantic-settings` ile env variable yonetimi, `.env` okuma
+- **Serialization:** `model_dump(exclude_unset=True)` — PATCH endpointleri icin
+
+```python
+from pydantic import BaseModel, Field, model_validator
+
+class CreateOrderRequest(BaseModel):
+    customer_id: int = Field(gt=0)
+    items: list[OrderItemRequest] = Field(min_length=1)
+    
+    @model_validator(mode="after")
+    def validate_items(self) -> "CreateOrderRequest":
+        skus = [item.sku for item in self.items]
+        if len(skus) != len(set(skus)):
+            raise ValueError("Duplicate SKUs not allowed")
+        return self
+```
+
+## SQLAlchemy 2.0 + Alembic
+- **Mapped classes:** `DeclarativeBase` + `Mapped[T]` type annotations — legacy style KULLANMA
+- **Session:** `async_sessionmaker` + `AsyncSession` — senkron session YASAK (async projede)
+- **Unit of Work:** Session = UoW; `async with session.begin():` ile otomatik commit/rollback
+- **Repository pattern:** Abstract base → SQLAlchemy implementation
+- **Eager loading:** `selectinload()` veya `joinedload()` — N+1 onleme
+- **Alembic:** `alembic revision --autogenerate -m "add_orders_table"` — elle migration YASAK (autogenerate kullan, sonra dogrula)
+
+```python
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy import ForeignKey
+from datetime import datetime
+
+class Base(DeclarativeBase):
+    pass
+
+class Order(Base):
+    __tablename__ = "orders"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"))
+    status: Mapped[str] = mapped_column(default="pending")
+    created_at: Mapped[datetime] = mapped_column(default_factory=datetime.utcnow)
+    items: Mapped[list["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
+```
+
+## Async Patterns
+- **asyncio:** `async def` + `await` — ASLA `loop.run_until_complete()` (ust seviye disinda)
+- **Concurrency:** `asyncio.gather()` ile paralel I/O; `asyncio.TaskGroup` (3.11+) ile structured concurrency
+- **Database:** `asyncpg` + `sqlalchemy[asyncio]` — sync driver async projede KULLANMA
+- **HTTP client:** `httpx.AsyncClient` — `requests` KULLANMA (async projede)
+- **Background tasks:** Kisa isler → FastAPI `BackgroundTasks`; uzun isler → Celery
+- **Timeout:** `asyncio.timeout()` (3.11+) ile I/O islemlerinde timeout zorunlu
+
+## Type Hints ve Static Analysis
+- **Her fonksiyon:** Parametre ve donus tipi ZORUNLU — `def get_order(order_id: int) -> Order | None:`
+- **Collections:** `list[str]`, `dict[str, int]` — `List`, `Dict` (typing) KULLANMA (3.9+)
+- **Optional:** `str | None` — `Optional[str]` KULLANMA (3.10+)
+- **TypeAlias:** `type Vector = list[float]` (3.12+)
+- **Protocol:** Duck typing icin `Protocol` class — ABC yerine tercih et (structural subtyping)
+- **mypy:** `strict` mode CI'da zorunlu; `# type: ignore` icin NEDEN yorum ekle
+
+## Test (pytest)
+- **pytest:** Test dosyalari `test_*.py`, test fonksiyonlari `test_*`
+- **Fixtures:** `conftest.py` ile paylasimli fixture'lar; scope dogru sec (`function`, `session`)
+- **Async test:** `pytest-asyncio` + `@pytest.mark.asyncio`
+- **DB test:** `testcontainers-python` ile gercek PostgreSQL; SQLite kullanma
+- **Mocking:** `unittest.mock.patch` veya `pytest-mock` — disariya giden cagriler mock'la
+- **Coverage:** `pytest-cov` — `pytest --cov=app --cov-report=term-missing`
+- **Factory:** `factory_boy` ile test verisi olustur — fixture icinde elle veri yazma
+
+```python
+import pytest
+from httpx import AsyncClient, ASGITransport
+
+@pytest.mark.asyncio
+async def test_create_order(client: AsyncClient):
+    response = await client.post("/api/v1/orders", json={
+        "customer_id": 1,
+        "items": [{"sku": "ABC-001", "quantity": 5}]
+    })
+    assert response.status_code == 201
+    data = response.json()
+    assert data["status"] == "pending"
+```
+
+## Guvenlik
+- **Auth:** `python-jose` (JWT) veya `authlib`; secret `.env`'de, ASLA kodda
+- **Password:** `passlib[bcrypt]` — plain text ASLA
+- **Input validation:** Pydantic schema = giris noktasi validasyonu; SQL injection riski yok (ORM kullan)
+- **CORS:** `CORSMiddleware` ile izin verilen origin'ler explicit listele
+- **Rate limiting:** `slowapi` veya reverse proxy (nginx) seviyesinde
+- **Dependencies:** `pip-audit` veya `safety` CI'da zorunlu
+
+## Dependency Management
+- **pyproject.toml:** PEP 621 — `setup.py`/`setup.cfg` KULLANMA
+- **Lock file:** `uv.lock`, `poetry.lock` veya `pip-tools` (`requirements.txt` + `requirements-dev.txt`)
+- **Virtual env:** `uv venv` veya `python -m venv .venv` — global install YASAK
+- **Pinning:** Production'da exact version (`==`); development'da compatible (`~=`)
+
+## Naming Conventions
+- **Modules/packages:** snake_case (`order_service.py`)
+- **Classes:** PascalCase (`OrderService`, `CreateOrderCommand`)
+- **Functions/methods:** snake_case, fiil ile basla (`get_order_by_id`, `calculate_total`)
+- **Constants:** UPPER_SNAKE_CASE (`MAX_RETRY_COUNT`, `DEFAULT_PAGE_SIZE`)
+- **Private:** `_` prefix (`_validate_stock`, `_repository`)
+- **Type aliases:** PascalCase (`type OrderId = int`)
+- **Boolean:** is/has/can prefix (`is_active`, `has_stock`, `can_cancel`)
+- **Async functions:** `async_` prefix KULLANMA — async/sync ayrimi imzada belli
+
+## Anti-Pattern'ler
+| Anti-Pattern | Dogru Yaklasim |
+|---|---|
+| Global mutable state | Dependency injection (Depends) |
+| `import *` | Explicit import |
+| Bare `except:` | Specific exception + loglama |
+| `print()` for logging | `logging` module (structured) |
+| Sync DB in async app | `asyncpg` + `AsyncSession` |
+| `datetime.now()` | `datetime.now(tz=UTC)` (timezone-aware) |
+| Hardcoded config | `pydantic-settings` + `.env` |
+| `os.environ` directly | Settings class ile merkezi yonetim |
+| Test'te real API call | `httpx.MockTransport` veya `respx` |
+| Missing type hints | `mypy --strict` CI'da enforce |
+
+## Performans
+- **Profiling:** `py-spy`, `cProfile`, `line_profiler`
+- **Async pool:** `asyncpg` pool size = CPU core * 2 + 1 (PostgreSQL)
+- **Caching:** `redis.asyncio` + `@cache` decorator pattern
+- **Serialization:** Pydantic v2 Rust core — 5-50x hizli (v1'e gore)
+- **Startup:** Lazy import, connection pool warm-up lifespan'da
+- **Memory:** Generator/async generator buyuk dataset'ler icin — liste yerine `yield`

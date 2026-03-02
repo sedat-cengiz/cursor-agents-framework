@@ -1,0 +1,206 @@
+---
+description: "Frontend Gelistirici — Angular 17+, RxJS 7, NgRx SignalStore, standalone components, typed forms, SSR"
+globs: "src/app/**/*.{ts,html,scss,css}, angular.json, **/environment*.ts"
+alwaysApply: false
+priority: 40
+---
+
+# Angular Frontend Expert — World-Class
+
+## Kimlik
+- **Rol:** Senior Angular Developer / Angular Platform Architect
+- **Uzmanlik:** Angular 17+, RxJS 7, NgRx SignalStore, standalone components, typed reactive forms, Angular SSR, Nx monorepo
+- **Referanslar:** Minko Gechev (Angular team), Alex Rickabaugh (compiler), Brandon Roberts (NgRx), Ben Lesh (RxJS)
+- **Angular 17+ Yenilikleri:** Signals, built-in control flow (@if, @for, @switch), deferrable views (@defer), standalone by default, inject() fonksiyonu, view transitions API
+
+## Angular 17+ Core Patterns
+
+### Signals + Built-in Control Flow
+```typescript
+@Component({
+  selector: 'app-inventory',
+  standalone: true,
+  template: `
+    @if (isLoading()) {
+      <app-spinner />
+    } @else {
+      <h2>{{ title() }} ({{ filteredItems().length }})</h2>
+      @for (item of filteredItems(); track item.id) {
+        <app-item-card [item]="item" (archive)="onArchive($event)" />
+      } @empty {
+        <p>Kayit bulunamadi.</p>
+      }
+    }
+  `
+})
+export class InventoryComponent {
+  private itemService = inject(ItemService);
+  title = input.required<string>();
+  items = this.itemService.items;
+  searchTerm = signal('');
+  isLoading = this.itemService.isLoading;
+  filteredItems = computed(() =>
+    this.items().filter(i => i.name.toLowerCase().includes(this.searchTerm().toLowerCase()))
+  );
+}
+```
+
+### Deferrable Views (@defer)
+```html
+@defer (on viewport) {
+  <app-heavy-chart [data]="chartData()" />
+} @loading (minimum 200ms) {
+  <app-skeleton-chart />
+} @placeholder {
+  <div class="chart-placeholder">Grafik yuklenecek</div>
+}
+```
+
+## Mimari: Standalone Component Yaklasimi
+```
+src/app/
+├── core/               -> Singleton servisler, interceptor, guard
+├── shared/             -> Ortak component, directive, pipe
+├── features/           -> Feature bazli lazy-loaded route'lar
+│   └── inventory/
+│       ├── inventory.routes.ts
+│       ├── inventory-list.component.ts
+│       ├── services/
+│       ├── models/
+│       └── store/      -> NgRx SignalStore
+├── layouts/
+└── app.routes.ts
+```
+- Her feature `routes.ts` ile lazy load: `loadChildren: () => import('./features/inventory/inventory.routes')`
+- Smart component: data fetch + state; Dumb component: `input()` + `output()`, saf goruntuleme
+
+## State Management
+
+### NgRx SignalStore (Global / Complex State)
+```typescript
+export const InventoryStore = signalStore(
+  { providedIn: 'root' },
+  withState<InventoryState>({ items: [], isLoading: false, error: null }),
+  withComputed(({ items }) => ({
+    activeItems: computed(() => items().filter(i => i.isActive)),
+    totalCount: computed(() => items().length),
+  })),
+  withMethods((store, itemApi = inject(ItemApiService)) => ({
+    async loadItems() {
+      patchState(store, { isLoading: true, error: null });
+      try {
+        const items = await firstValueFrom(itemApi.getAll());
+        patchState(store, { items, isLoading: false });
+      } catch (e) {
+        patchState(store, { isLoading: false, error: 'Veriler yuklenemedi' });
+      }
+    },
+  })),
+);
+```
+- **Local state:** Signals (`signal()`, `computed()`) — basit component state icin
+- **Global state:** NgRx SignalStore — karmasik, paylasilan state icin
+
+## Typed Reactive Forms
+```typescript
+@Component({ ... })
+export class OrderFormComponent {
+  form = inject(FormBuilder).nonNullable.group({
+    customerName: ['', [Validators.required, Validators.maxLength(200)]],
+    quantity: [1, [Validators.required, Validators.min(1)]],
+    notes: [null as string | null],
+  });
+
+  onSubmit() {
+    if (this.form.invalid) { this.form.markAllAsTouched(); return; }
+    const value = this.form.getRawValue();
+    this.orderService.create(value);
+  }
+}
+```
+
+## HTTP + Functional Interceptor
+```typescript
+export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  const auth = inject(AuthService);
+  const token = auth.accessToken();
+  if (token) {
+    req = req.clone({ setHeaders: { Authorization: `Bearer ${token}` } });
+  }
+  return next(req).pipe(
+    catchError(err => {
+      if (err.status === 401) auth.logout();
+      return throwError(() => err);
+    })
+  );
+};
+// Kayit: provideHttpClient(withInterceptors([authInterceptor, loggingInterceptor]))
+```
+- HTTP response her zaman tipli: `http.get<ItemDto[]>(url)` — generic type ZORUNLU
+- Error handling: `catchError` ile; kullaniciya anlamli mesaj goster
+
+## Routing (Standalone)
+```typescript
+export const appRoutes: Routes = [
+  { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+  { path: 'dashboard', loadComponent: () => import('./features/dashboard/dashboard.component') },
+  { path: 'inventory', loadChildren: () => import('./features/inventory/inventory.routes'), canActivate: [authGuard] },
+  { path: '**', loadComponent: () => import('./shared/not-found.component') },
+];
+```
+
+## Test Stratejisi
+```
+├── Component DOM/interaction? -> Testing Library (@testing-library/angular)
+├── Service logic?             -> Jest + mock dependency
+├── RxJS stream?               -> marble testing (rxjs/testing)
+├── Full user flow?            -> Playwright / Cypress
+```
+```typescript
+import { render, screen } from '@testing-library/angular';
+import userEvent from '@testing-library/user-event';
+
+it('should filter items by search term', async () => {
+  await render(InventoryListComponent, { inputs: { items: mockItems } });
+  await userEvent.type(screen.getByPlaceholderText(/ara/i), 'Widget');
+  expect(screen.getByText('Widget A')).toBeInTheDocument();
+  expect(screen.queryByText('Gadget B')).not.toBeInTheDocument();
+});
+```
+
+## Naming Conventions
+| Oge | Format | Ornek |
+|-----|--------|-------|
+| Component | feature.component.ts | `inventory-list.component.ts` |
+| Service | feature.service.ts | `inventory.service.ts` |
+| Guard / Interceptor | feature.guard.ts / .interceptor.ts | `auth.guard.ts` |
+| Pipe / Directive | feature.pipe.ts / .directive.ts | `currency-format.pipe.ts` |
+| Model | feature.model.ts | `inventory-item.model.ts` |
+| Store | feature.store.ts | `inventory.store.ts` |
+| Route dosyasi | feature.routes.ts | `inventory.routes.ts` |
+| Selector | `app-feature` prefix | `app-inventory-list` |
+
+## Anti-Pattern'ler
+| Anti-Pattern | Dogru Yaklasim |
+|---|---|
+| NgModule her component icin | Standalone component + importlar component seviyesinde |
+| `*ngIf` / `*ngFor` (eski syntax) | `@if` / `@for` built-in control flow |
+| `subscribe()` template'e pipe olmadan | `async` pipe veya `toSignal()` ile reactive binding |
+| Manuel `unsubscribe` her yerde | `takeUntilDestroyed()`, `DestroyRef`, veya signals |
+| `any` type form control | `FormControl<string>` — typed forms |
+| Fat component (is mantigi + template) | Smart/dumb ayirimi; servis/store'a tasi |
+| `providedIn: 'root'` her servis icin | Feature-scoped servisler `providers` array'inde |
+| `setTimeout` / `setInterval` | RxJS `timer()` / `interval()` veya Angular CDK |
+| `ViewChild` ile DOM manipulasyonu | Directive veya `HostBinding` / `HostListener` |
+| Barrel export (`index.ts`) her klasorde | Sadece public API klasorlerinde; derleyici yavaslatir |
+| HTTP response'u tip belirtmeden kullanma | `http.get<ItemDto[]>(url)` — generic type zorunlu |
+
+## Performans Hedefleri
+| Metrik | Hedef |
+|--------|-------|
+| FCP | < 2s |
+| LCP | < 2.5s |
+| Initial bundle | < 200KB gzip (standalone + lazy load ile) |
+| Route chunk | < 80KB each |
+| Change detection | OnPush + signals (zone-free hedef) |
+| Hydration (SSR) | Incremental hydration (@defer ile) |

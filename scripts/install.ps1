@@ -64,15 +64,21 @@ Write-Host "        > global-conventions, orchestrator, code-quality" -Foregroun
 # STEP 2: Technology
 # ═══════════════════════════════════════
 $techPacks = @{
-    "1" = "tech-dotnet";    "dotnet"     = "tech-dotnet"
-    "2" = "tech-react";     "react"      = "tech-react"
-    "3" = "tech-python";    "python"     = "tech-python"
-    "4" = "tech-sql-server";"sql-server" = "tech-sql-server"
-    "5" = "tech-maui";      "maui"       = "tech-maui"
-    "6" = "tech-ai-ml";     "ai-ml"      = "tech-ai-ml"
-    "7" = "tech-devops";    "devops"     = "tech-devops"
-    "8" = "tech-security";  "security"   = "tech-security"
-    "9" = "tech-testing";   "testing"    = "tech-testing"
+    "1"  = "tech-dotnet";    "dotnet"     = "tech-dotnet"
+    "2"  = "tech-react";     "react"      = "tech-react"
+    "3"  = "tech-python";    "python"     = "tech-python"
+    "4"  = "tech-java";      "java"       = "tech-java"
+    "5"  = "tech-go";        "go"         = "tech-go"
+    "6"  = "tech-angular";   "angular"    = "tech-angular"
+    "7"  = "tech-vue";       "vue"        = "tech-vue"
+    "8"  = "tech-nextjs";    "nextjs"     = "tech-nextjs"
+    "9"  = "tech-flutter";   "flutter"    = "tech-flutter"
+    "10" = "tech-sql-server";"sql-server" = "tech-sql-server"
+    "11" = "tech-maui";      "maui"       = "tech-maui"
+    "12" = "tech-ai-ml";     "ai-ml"      = "tech-ai-ml"
+    "13" = "tech-devops";    "devops"     = "tech-devops"
+    "14" = "tech-security";  "security"   = "tech-security"
+    "15" = "tech-testing";   "testing"    = "tech-testing"
 }
 
 Write-Host ""
@@ -91,18 +97,21 @@ if ($manifest) {
         }
     }
 } else {
-    Write-Host "    1) .NET Backend      2) React Frontend    3) Python Backend"
-    Write-Host "    4) SQL Server        5) .NET MAUI Mobile  6) AI/ML"
-    Write-Host "    7) DevOps            8) Security          9) Testing"
-    Write-Host "    A) ALL"
-    $choice = Read-Host "  Select (e.g. 1289 or A)"
+    Write-Host "     1) .NET Backend      2) React Frontend     3) Python Backend"
+    Write-Host "     4) Java/Spring       5) Go                 6) Angular"
+    Write-Host "     7) Vue               8) Next.js            9) Flutter"
+    Write-Host "    10) SQL Server       11) .NET MAUI         12) AI/ML"
+    Write-Host "    13) DevOps           14) Security          15) Testing"
+    Write-Host "     A) ALL"
+    $choice = Read-Host "  Select (e.g. 1,2,14,15 or A)"
 
     if ($choice -eq "A" -or $choice -eq "a") {
-        Copy-Item (Join-Path $FrameworkPath "technology" "*.mdc") $TargetRules -Force
+        Copy-Item (Join-Path $FrameworkPath "technology" "tech-*.mdc") $TargetRules -Force
         Write-Host "        > All technology packs installed" -ForegroundColor Green
     } else {
-        foreach ($c in $choice.ToCharArray()) {
-            $pack = $techPacks["$c"]
+        $selections = $choice -split "[,\s]+" | Where-Object { $_ -ne "" }
+        foreach ($c in $selections) {
+            $pack = $techPacks[$c.Trim()]
             if ($pack) {
                 $src = Join-Path $FrameworkPath "technology" "$pack.mdc"
                 if (Test-Path $src) {
@@ -211,7 +220,7 @@ Write-Host "        > Learning + docs/agents/ structure created" -ForegroundColo
 Write-Host ""
 Write-Host "  [6/6] Creating aliases..." -ForegroundColor Yellow
 
-$defaultAliases = @{
+$trAliases = @{
     "sef"           = "orchestrator"
     "review"        = "code-quality"
     "backend"       = "tech-dotnet"
@@ -225,6 +234,35 @@ $defaultAliases = @{
     "mimari"        = "process-architecture"
     "analist"       = "process-analysis"
     "dokumantasyon" = "process-documentation"
+}
+
+$enAliases = @{
+    "pm"            = "orchestrator"
+    "review"        = "code-quality"
+    "backend"       = "tech-dotnet"
+    "frontend"      = "tech-react"
+    "qa"            = "tech-testing"
+    "db"            = "tech-sql-server"
+    "security"      = "tech-security"
+    "devops"        = "tech-devops"
+    "mobile"        = "tech-maui"
+    "ai"            = "tech-ai-ml"
+    "architect"     = "process-architecture"
+    "analyst"       = "process-analysis"
+    "docs"          = "process-documentation"
+}
+
+$aliasLang = "tr"
+if ($manifest -and $manifest.aliasLanguage) {
+    $aliasLang = $manifest.aliasLanguage
+}
+
+$defaultAliases = @{}
+if ($aliasLang -eq "tr" -or $aliasLang -eq "both") {
+    foreach ($k in $trAliases.Keys) { $defaultAliases[$k] = $trAliases[$k] }
+}
+if ($aliasLang -eq "en" -or $aliasLang -eq "both") {
+    foreach ($k in $enAliases.Keys) { $defaultAliases[$k] = $enAliases[$k] }
 }
 
 if ($manifest -and $manifest.aliases) {

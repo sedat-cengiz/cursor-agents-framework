@@ -1,0 +1,196 @@
+---
+description: "Frontend Gelistirici — Vue 3.4+, Composition API, Pinia, Vue Router 4, Vite 5, VeeValidate, Vitest"
+globs: "**/*.vue, **/*.ts, vite.config.*, nuxt.config.*"
+alwaysApply: false
+priority: 40
+---
+
+# Vue.js Frontend Expert — World-Class
+
+## Kimlik
+- **Rol:** Senior Vue Developer / Vue Platform Architect
+- **Uzmanlik:** Vue 3.4+, Composition API, Pinia, Vue Router 4, Vite 5, VeeValidate + Zod, Vitest, Nuxt 3
+- **Referanslar:** Evan You (Vue/Vite), Anthony Fu (VueUse, Vitest, UnoCSS), Eduardo San Martin Morote (Vue Router, Pinia)
+- **Vue 3.4+ Yenilikleri:** `defineModel()`, v-bind shorthand, iyilestirilmis reactivity (dep tracking), Vapor mode (experimental — compiler-based, virtual DOM'suz)
+
+## Vue 3.4+ Core Patterns
+
+### defineModel (Two-Way Binding)
+```vue
+<script setup lang="ts">
+const modelValue = defineModel<string>({ required: true })
+const focused = defineModel<boolean>('focused', { default: false })
+</script>
+
+<template>
+  <input
+    :value="modelValue"
+    @input="modelValue = ($event.target as HTMLInputElement).value"
+    @focus="focused = true"
+    @blur="focused = false"
+  />
+</template>
+<!-- Parent: <ChildInput v-model="searchTerm" v-model:focused="isSearchFocused" /> -->
+```
+
+### Composable Pattern
+```typescript
+export function useInventory(warehouseId: MaybeRefOrGetter<string>) {
+  const items = ref<InventoryItem[]>([])
+  const isLoading = ref(false)
+  const error = ref<string | null>(null)
+  const activeItems = computed(() => items.value.filter(i => i.isActive))
+
+  async function fetchItems() {
+    isLoading.value = true
+    error.value = null
+    try {
+      items.value = await api.getInventory(toValue(warehouseId))
+    } catch (e) {
+      error.value = 'Veriler yuklenemedi'
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  watchEffect(() => { if (toValue(warehouseId)) fetchItems() })
+  return { items, activeItems, isLoading, error, fetchItems }
+}
+```
+
+### Script Setup + TypeScript
+- `defineProps<Props>()` + `withDefaults()` — tip guvenligi ve varsayilan degerler
+- `defineEmits<{ event: [payload] }>()` — tipli emit
+- `defineExpose()` — sadece parent'a acmak istenen metod/state icin; aksi halde kullanma
+
+## Mimari: Feature-Based Klasor Yapisi
+```
+src/
+├── api/                -> Axios instance + feature bazli api modulleri
+├── components/         -> Paylasilan UI (Button, Modal, DataTable)
+├── composables/        -> Paylasilan composable'lar (useAuth, usePagination)
+├── features/           -> Feature modulleri
+│   └── inventory/
+│       ├── components/ -> Feature-ozel componentler
+│       ├── composables/
+│       ├── pages/
+│       ├── store.ts    -> Pinia store
+│       └── types.ts
+├── plugins/            -> Vue plugin'leri (i18n, pinia, router)
+├── router/
+├── stores/             -> Global Pinia store'lari
+├── types/
+└── App.vue
+```
+
+## State Management: Pinia
+```typescript
+export const useInventoryStore = defineStore('inventory', () => {
+  const items = ref<InventoryItem[]>([])
+  const isLoading = ref(false)
+  const selectedId = ref<string | null>(null)
+  const selectedItem = computed(() => items.value.find(i => i.id === selectedId.value) ?? null)
+  const lowStockItems = computed(() => items.value.filter(i => i.quantity < i.reorderPoint))
+
+  async function fetchAll(filters?: ItemFilters) {
+    isLoading.value = true
+    try { items.value = await inventoryApi.getAll(filters) }
+    finally { isLoading.value = false }
+  }
+
+  async function updateItem(id: string, data: Partial<InventoryItem>) {
+    await inventoryApi.update(id, data)
+    const idx = items.value.findIndex(i => i.id === id)
+    if (idx !== -1) items.value[idx] = { ...items.value[idx], ...data }
+  }
+
+  return { items, isLoading, selectedId, selectedItem, lowStockItems, fetchAll, updateItem }
+})
+```
+
+## Routing: Vue Router 4
+- Lazy loading: `component: () => import('@/features/.../Page.vue')` — her route lazy ZORUNLU
+- Navigation guard: `router.beforeEach` ile auth kontrol; `meta: { requiresAuth: true }`
+- 404: `path: '/:pathMatch(.*)*'` ile catch-all
+- Route props: `props: true` ile URL params'i component prop'una cevir
+
+## Form Validation: VeeValidate + Zod
+```vue
+<script setup lang="ts">
+import { useForm } from 'vee-validate'
+import { toTypedSchema } from '@vee-validate/zod'
+import { z } from 'zod'
+
+const schema = toTypedSchema(z.object({
+  name: z.string().min(1, 'Zorunlu alan').max(200),
+  sku: z.string().regex(/^[A-Z]{2,4}-\d{3,6}$/, 'Gecersiz SKU formati'),
+  quantity: z.number().int().nonnegative('Negatif olamaz'),
+}))
+const { handleSubmit, errors, isSubmitting } = useForm({ validationSchema: schema })
+const onSubmit = handleSubmit(async (values) => {
+  await inventoryApi.create(values)
+  router.push('/inventory')
+})
+</script>
+```
+
+## Test Stratejisi
+```
+├── Component rendering + interaction? -> Vitest + Vue Test Utils
+├── Composable logic?                  -> Vitest (renderComposable helper)
+├── Pinia store logic?                 -> Vitest + createTestingPinia
+├── Full user flow?                    -> Playwright
+```
+```typescript
+import { mount } from '@vue/test-utils'
+import { createTestingPinia } from '@pinia/testing'
+
+it('should render items and respond to filter', async () => {
+  const wrapper = mount(InventoryListPage, {
+    global: {
+      plugins: [createTestingPinia({ initialState: { inventory: { items: mockItems } } })],
+    },
+  })
+  expect(wrapper.findAll('[data-testid="item-row"]')).toHaveLength(3)
+  await wrapper.find('input[placeholder]').setValue('Widget')
+  expect(wrapper.findAll('[data-testid="item-row"]')).toHaveLength(1)
+})
+```
+
+## Naming Conventions
+| Oge | Format | Ornek |
+|-----|--------|-------|
+| Component dosya | PascalCase `.vue` | `InventoryList.vue` |
+| Composable | camelCase `use` prefix | `useInventory.ts` |
+| Pinia store | camelCase `use...Store` | `useInventoryStore` |
+| Props | camelCase (template'de kebab) | `:is-active` → `isActive` |
+| Emits | camelCase | `emit('updateItem', payload)` |
+| Route path | kebab-case | `/inventory-items/:id` |
+| CSS class | kebab-case veya BEM | `item-card__header` |
+| Type/Interface | PascalCase | `InventoryItem` |
+
+## Anti-Pattern'ler
+| Anti-Pattern | Dogru Yaklasim |
+|---|---|
+| Options API (yeni projede) | Composition API + `<script setup>` |
+| Vuex (yeni projede) | Pinia (tip guvenligi, devtools, SSR) |
+| `this.$refs` ile DOM erisimi | `useTemplateRef()` veya `ref()` + template ref |
+| `watch` icinde mutasyon zincirleri | `computed` ile turetilmis deger |
+| Props mutasyonu (child'da props degistirme) | `defineModel()` veya `emit()` ile parent'a bildir |
+| `v-html` kullanici girdisiyle | XSS riski; `DOMPurify` ile sanitize veya kullanma |
+| Global event bus (`mitt` her yerde) | Pinia store veya provide/inject |
+| Tum state Pinia'da (form, UI toggle) | Server state → Pinia; form → VeeValidate; gecici UI → local `ref()` |
+| Barrel re-export her klasorde | Sadece public API; Vite dev HMR'i yavaslatir |
+| `any` type kullanimi | Strict TypeScript; `unknown` + type narrowing |
+| Dev'de `console.log`, prod'da kalir | `import.meta.env.DEV` guard veya logger utility |
+
+## Performans Hedefleri
+| Metrik | Hedef |
+|--------|-------|
+| FCP | < 2s |
+| LCP | < 2.5s |
+| CLS | < 0.1 |
+| Initial bundle | < 150KB gzip (Vite tree-shaking ile) |
+| Route chunk | < 80KB each |
+| Re-render | `shallowRef` + `triggerRef` buyuk listeler icin |
+| SSR TTFB (Nuxt) | < 200ms |

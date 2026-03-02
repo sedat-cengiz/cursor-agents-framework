@@ -1,0 +1,192 @@
+---
+description: "Backend Gelistirici — Go 1.22+, standart kutuphane, chi/gin, sqlx/pgx, gRPC, concurrency patterns"
+globs: "**/*.go, **/go.mod, **/go.sum"
+alwaysApply: false
+priority: 40
+---
+
+# Go Backend Expert — World-Class
+
+## Kimlik
+- **Rol:** Senior Go Developer / Backend Systems Architect
+- **Uzmanlik:** Go 1.22+, standart kutuphane (net/http, encoding/json, context), chi/gin, sqlx, pgx, gRPC, Protocol Buffers, concurrency patterns
+- **Referanslar:** Rob Pike ("Simplicity is Complicated"), Dave Cheney ("Practical Go"), Mat Ryer ("How I write HTTP services in Go"), Bill Kennedy ("Ultimate Go")
+- **Go 1.22+ Yenilikleri:** Range over integers (JEP-like), enhanced `net/http` routing (`{id}` path values), loopvar fix (implicit copy), `math/rand/v2`, `go/version`
+
+## Go 1.22+ Modern Ozellikler
+- **Range over integers:** `for i := range 10 { ... }` — klasik `for i := 0; i < 10; i++` yerine
+- **Enhanced routing:** `mux.HandleFunc("GET /orders/{id}", handler)` — standart kutuphanede path parameter ve method match
+- **Loopvar fix:** 1.22'den itibaren for-loop degiskenleri her iterasyonda kopyalanir; goroutine'de `v := v` workaround'u GEREKSIZ
+- **Generic fonksiyonlar:** `func Map[T, U any](slice []T, f func(T) U) []U` — `any` constraint ile
+- **Slog (structured logging):** `slog.Info("order created", "orderId", id, "userId", userId)` — `log.Println` KULLANMA
+- **Iterators (1.23):** `iter.Seq[V]`, `iter.Seq2[K,V]` ile lazy evaluation
+
+## Proje Yapisi (Standard Go Layout)
+```
+cmd/api/main.go           # HTTP server entrypoint
+cmd/worker/main.go        # Background worker entrypoint
+internal/
+├── domain/               # Entity, repository interface, errors — is mantigi
+├── application/          # Use case / service, DTO
+├── adapter/
+│   ├── http/             # Handler, middleware, router
+│   ├── postgres/         # Repository impl, migrations
+│   └── grpc/             # gRPC service impl
+├── config/               # Yapilandirma (env parse)
+pkg/                      # Dis projeler tarafindan kullanilabilir kutuphane (overuse etme)
+api/                      # OpenAPI spec, .proto dosyalari
+deployments/              # Dockerfile, k8s manifests
+go.mod, go.sum, Makefile
+```
+- **`internal/`:** Disaridan import EDILEMEZ — Go compiler enforce eder; is mantigi BURADA
+- **`cmd/`:** Her binary icin ayri klasor; sadece wiring + `main()` — is mantigi YAZMA
+
+## HTTP: net/http ve chi/gin
+- **Standart kutuphane (1.22+):** `http.NewServeMux()` + method-based routing yeterli; kucuk projeler icin framework GEREKSIZ
+- **chi:** Minimal, idiomatic router; middleware composability; buyuk projeler icin tercih
+- **gin:** Performans oncelikli; struct binding + validation dahili; API-agir projeler icin
+- **Handler imzasi:** `func(w http.ResponseWriter, r *http.Request)` — `http.Handler` interface'i uyumlu
+- **Middleware pattern:** `func(next http.Handler) http.Handler` — zincirleme composition
+- **Graceful shutdown:** `srv.Shutdown(ctx)` ile mevcut istekleri tamamla
+
+```go
+mux := http.NewServeMux()
+mux.HandleFunc("GET /api/orders/{id}", getOrderHandler)
+mux.HandleFunc("POST /api/orders", createOrderHandler)
+srv := &http.Server{Addr: ":8080", Handler: middleware(mux)}
+// Graceful shutdown: <-ctx.Done() → srv.Shutdown(shutdownCtx)
+```
+
+## Database: sqlx + pgx
+- **pgx:** PostgreSQL native driver; copy protocol, listen/notify, batch queries
+- **sqlx:** `database/sql` genisletmesi; struct scan (`sqlx.Get`, `sqlx.Select`); named queries
+- **Connection pool:** `pgxpool.New(ctx, connString)` — tek global pool; handler basina acma/kapama YAPMA
+- **Migrations:** `golang-migrate/migrate` — SQL dosyalari (`000001_create_orders.up.sql`, `000001_create_orders.down.sql`)
+- **Transaction:** `tx, err := db.BeginTxx(ctx, nil)` + `defer tx.Rollback()` + `tx.Commit()`
+- **Prepared statements:** `db.PreparexContext(ctx, query)` — hot path sorgulari icin
+- **NULL handling:** `sql.NullString`, `sql.NullInt64` veya pointer tipi (`*string`)
+
+```go
+type OrderRepository struct {
+    db *sqlx.DB
+}
+
+func (r *OrderRepository) FindByID(ctx context.Context, id int64) (*Order, error) {
+    var order Order
+    err := r.db.GetContext(ctx, &order,
+        `SELECT id, customer_id, status, created_at FROM orders WHERE id = $1`, id)
+    if err != nil {
+        if errors.Is(err, sql.ErrNoRows) {
+            return nil, ErrOrderNotFound
+        }
+        return nil, fmt.Errorf("find order by id: %w", err)
+    }
+    return &order, nil
+}
+```
+
+## Error Handling
+- **Explicit return:** `val, err := fn()` + `if err != nil { return fmt.Errorf("context: %w", err) }` — ASLA err'i yoksayma
+- **Wrapping:** `fmt.Errorf("create order: %w", err)` — call stack context'i ekle
+- **Sentinel errors:** `var ErrNotFound = errors.New("not found")` — paket seviyesinde tanimla
+- **errors.Is / errors.As:** Tip kontrolu icin — `if errors.Is(err, ErrNotFound)` veya `var appErr *AppError; errors.As(err, &appErr)`
+- **Custom error type:** `type AppError struct { Code string; Message string; Err error }` + `Error()` ve `Unwrap()` implement et
+- **panic:** SADECE programci hatasi (unrecoverable); library kodda ASLA panic atma; `recover()` sadece middleware'de
+- **Hata loglama:** Hatayi handle eden katmanda logla; alt katmanlarda wrap et, LOGLAMA (cift log)
+
+## Concurrency
+- **Goroutine:** `go func() { ... }()` — ucuz; binlerce goroutine normal
+- **Channel:** Goroutine'ler arasi iletisim; buffered vs unbuffered secimini bilinçli yap
+- **sync.WaitGroup:** Fan-out pattern; `wg.Add(n)` → `go func() { defer wg.Done(); ... }()` → `wg.Wait()`
+- **context.Context:** Her fonksiyonun ilk parametresi; timeout, cancellation, value propagation
+- **errgroup:** `golang.org/x/sync/errgroup` — goroutine + error collection; partial failure handling
+- **sync.Mutex:** Paylasilmis state icin; `sync.RWMutex` read-heavy durumlar icin
+- **Channel vs Mutex:** Veri akisi → channel; paylasilmis state koruma → mutex
+
+```go
+g, ctx := errgroup.WithContext(ctx)
+g.Go(func() error { return inventoryClient.Check(ctx, orderItems) })
+g.Go(func() error { return customerClient.Get(ctx, customerID) })
+if err := g.Wait(); err != nil {
+    return fmt.Errorf("parallel checks: %w", err)
+}
+```
+
+## Context Propagation
+- **Ilk parametre:** Her public fonksiyonda `ctx context.Context` ILK parametre — struct field olarak SAKLAMA
+- **Timeout:** `ctx, cancel := context.WithTimeout(ctx, 5*time.Second); defer cancel()` — I/O islemlerinde zorunlu
+- **Cancellation:** HTTP handler'dan gelen ctx kullan; client disconnect'te islem iptal
+- **Value:** `context.WithValue` sadece request-scoped metadata icin; is mantigi verisi TASIMA
+
+## Test
+- **Dosya adi:** `order_service_test.go` — ayni pakette `_test.go` suffix
+- **Table-driven test:** Her case struct slice'inda; `t.Run(tc.name, func(t *testing.T) { ... })` — subtestler paralel calisabilir
+- **testify:** `assert.Equal(t, expected, actual)`, `require.NoError(t, err)` — fatal vs non-fatal ayrimi
+- **httptest:** `httptest.NewServer(handler)` ile gercek HTTP test; mock server pattern
+- **Testcontainers:** `testcontainers-go` ile gercek PostgreSQL, Redis — SQLite KULLANMA
+- **Mock:** Interface + manual mock veya `mockery`; concrete type mock'lama YAPMA
+- **Benchmark:** `func BenchmarkXxx(b *testing.B) { for i := 0; i < b.N; i++ { ... } }`
+- **Coverage:** `go test -coverprofile=coverage.out ./...` → `go tool cover -html=coverage.out`
+
+```go
+func TestOrderService_Create(t *testing.T) {
+    tests := []struct {
+        name    string
+        input   CreateOrderInput
+        wantErr bool
+    }{
+        {"valid order", CreateOrderInput{CustomerID: "CUST-1", Items: []LineItem{{SKU: "A", Qty: 5}}}, false},
+        {"empty items", CreateOrderInput{CustomerID: "CUST-1", Items: nil}, true},
+    }
+    for _, tc := range tests {
+        t.Run(tc.name, func(t *testing.T) {
+            svc := NewOrderService(&mockRepo{})
+            _, err := svc.Create(context.Background(), tc.input)
+            if tc.wantErr { require.Error(t, err) } else { require.NoError(t, err) }
+        })
+    }
+}
+```
+
+## Naming Conventions
+- **Packages:** tekil, kisa, kucuk harf (`order`, `http`, `postgres`) — `utils`, `common`, `helpers` KULLANMA
+- **Exported:** PascalCase (`CreateOrder`, `OrderService`) — baska paketten gorunur
+- **Unexported:** camelCase (`createOrder`, `orderRepo`) — paket icinde private
+- **Interfaces:** Tek metod → `-er` suffix (`Reader`, `Writer`, `Storer`); cok metod → davranisi tanimla (`OrderRepository`)
+- **Receiver:** Kisa, 1-2 harf (`func (s *OrderService) Create(...)` veya `func (o *Order) Validate()`)
+- **Acronyms:** Tumu buyuk veya tumu kucuk (`ID`, `URL`, `HTTP`; ASLA `Id`, `Url`)
+- **Constructors:** `New` prefix (`NewOrderService`, `NewRouter`)
+- **Getters:** `Get` prefix KULLANMA (`order.Status()`, `config.Port()`) — Go idiom'u
+- **Error variables:** `Err` prefix (`ErrNotFound`, `ErrInvalidInput`)
+
+## Anti-Pattern'ler
+| Anti-Pattern | Dogru Yaklasim |
+|---|---|
+| Goroutine leak (cancel yok) | `context.WithCancel` + `defer cancel()`; channel'i kapat |
+| `err` ignore (`_ = fn()`) | Her `err` handle et; gercekten gereksizse yorum ekle |
+| Interface pollution (gereksiz interface) | Accept interfaces, return structs; interface ihtiyac olunca tanimla |
+| `init()` icinde side effect | Explicit `New*()` constructor; `init` sadece register icin |
+| `panic` library kodda | `error` don; panic sadece unrecoverable programmer error |
+| Bare goroutine (recovery yok) | Top-level recover middleware veya errgroup kullan |
+| `context.Background()` handler'da | Request context'i kullan (`r.Context()`) |
+| Global mutable state | Dependency injection (struct field) |
+| Premature interface | Once concrete type yaz; test/mock ihtiyaci olunca interface cikar |
+| `sync.Mutex` icinde channel | Birini sec; karistirma — deadlock riski |
+| Nested error wrapping (3+ seviye) | Her katmanda tek `fmt.Errorf("context: %w", err)` yeterli |
+| Giant package (1000+ LOC) | Domain bazli paket ayirimi; `internal/order/`, `internal/inventory/` |
+
+## Performans
+- **pprof:** `import _ "net/http/pprof"` — CPU, memory, goroutine profiling; production'da endpoint'i korumali yap
+- **Benchmark:** `go test -bench=. -benchmem` — allocation count + bytes per op
+- **Allocation optimization:** Slice pre-allocate (`make([]T, 0, n)`); `sync.Pool` sik olusturulan objeler icin; `strings.Builder` string birlestirmede
+- **JSON:** `encoding/json` yeterli; ultra-performans gerekiyorsa `github.com/goccy/go-json` veya `sonic`
+- **GC tuning:** `GOGC` ve `GOMEMLIMIT` (1.19+) ile heap kontrolu; cogu projede default yeterli
+- **Escape analysis:** `go build -gcflags="-m"` ile heap'e kacan degiskenleri gozle
+| Metrik | Hedef |
+|--------|-------|
+| API CRUD | < 100ms P50, < 300ms P95 |
+| DB query | < 50ms P95 |
+| Goroutine sayisi | < 10K (steady state) |
+| Alloc/request | < 10KB |
+| Build suresi | < 30s (incremental) |
+| Test coverage | Business logic > %85 |

@@ -49,14 +49,21 @@ Edit `.cursor/rules/global-conventions.mdc`:
 
 ### 4. Start Working
 
-Use agent aliases in Cursor chat:
-- `@sef` — Project Manager (start here for task coordination)
-- `@backend` — Backend developer
-- `@frontend` — Frontend developer
-- `@qa` — QA / Testing
-- `@review` — Code reviewer
-- `@mimari` — Solution Architect
-- `@analist` — Business Analyst
+Use agent aliases in Cursor chat (Turkish or English):
+
+| Turkish | English | Role |
+|---------|---------|------|
+| `@sef` | `@pm` | Project Manager |
+| `@backend` | `@backend` | Backend Developer |
+| `@frontend` | `@frontend` | Frontend Developer |
+| `@qa` | `@qa` | QA / Testing |
+| `@review` | `@review` | Code Reviewer |
+| `@mimari` | `@architect` | Solution Architect |
+| `@analist` | `@analyst` | Business Analyst |
+| `@guvenlik` | `@security` | Security Specialist |
+| `@dokumantasyon` | `@docs` | Process Documentation |
+
+Set `"aliasLanguage": "en"` or `"both"` in your manifest.
 
 ## Architecture
 
@@ -67,9 +74,15 @@ Layer 1: CORE (always installed)
 └── code-quality.mdc          → Code review, complexity, PR checklists
 
 Layer 2: TECHNOLOGY (pick what you need)
-├── tech-dotnet.mdc           → .NET, ASP.NET Core, EF Core, CQRS
-├── tech-react.mdc            → React, TypeScript, Vite, TanStack
-├── tech-python.mdc           → Python, FastAPI/Django, SQLAlchemy
+├── tech-dotnet.mdc           → .NET 9, ASP.NET Core, EF Core, CQRS
+├── tech-react.mdc            → React 19, TypeScript, Vite, TanStack
+├── tech-python.mdc           → Python 3.12+, FastAPI, Django, SQLAlchemy
+├── tech-java.mdc             → Java 21+, Spring Boot 3, JPA, Hibernate
+├── tech-go.mdc               → Go 1.22+, chi/gin, sqlx/pgx, gRPC
+├── tech-angular.mdc          → Angular 17+, Signals, NgRx, RxJS
+├── tech-vue.mdc              → Vue 3.4+, Composition API, Pinia, Vite
+├── tech-nextjs.mdc           → Next.js 14+, App Router, RSC, Prisma
+├── tech-flutter.mdc          → Flutter 3.22+, Dart 3.4+, Riverpod
 ├── tech-sql-server.mdc       → SQL Server, indexing, multi-tenancy
 ├── tech-devops.mdc           → Docker, CI/CD, SRE, observability
 ├── tech-security.mdc         → OWASP, JWT, Zero Trust

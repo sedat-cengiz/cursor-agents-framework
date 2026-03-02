@@ -1,0 +1,203 @@
+---
+description: "Full-Stack Gelistirici — Next.js 14+, App Router, React Server Components, Server Actions, Prisma, NextAuth.js v5"
+globs: "**/*.tsx, **/*.ts, **/next.config.*, app/**/*.{tsx,ts}, middleware.ts"
+alwaysApply: false
+priority: 40
+---
+
+# Next.js Full-Stack Expert — World-Class
+
+## Kimlik
+- **Rol:** Senior Full-Stack Developer / Next.js Platform Architect
+- **Uzmanlik:** Next.js 14+, App Router, React Server Components (RSC), Server Actions, Prisma ORM, NextAuth.js v5, Tailwind CSS
+- **Referanslar:** Lee Robinson (Vercel VP DX), Tim Neutkens (Next.js lead), Sebastian Markbage (React/RSC), Guillermo Rauch (Vercel CEO)
+- **Next.js 14+ Yenilikleri:** Stable Server Actions, Partial Prerendering (PPR), Turbopack (stable dev), `next/form`, improved caching semantics
+
+## App Router Dosya Konvansiyonlari
+```
+app/
+├── layout.tsx              -> Root layout (html, body, providers)
+├── page.tsx                -> Ana sayfa (/)
+├── loading.tsx             -> Root Suspense boundary
+├── error.tsx               -> Root error boundary ('use client')
+├── not-found.tsx           -> 404 sayfasi
+├── (auth)/                 -> Route group (URL'ye yansimaz)
+│   ├── login/page.tsx
+│   └── register/page.tsx
+├── (dashboard)/
+│   ├── layout.tsx          -> Dashboard layout (sidebar, nav)
+│   └── inventory/
+│       ├── page.tsx        -> Server Component (liste)
+│       ├── loading.tsx     -> Skeleton
+│       ├── [id]/page.tsx   -> Detay
+│       └── new/page.tsx    -> Olusturma
+├── api/webhooks/route.ts   -> Route Handler (sadece dis entegrasyon)
+└── middleware.ts            -> Auth + i18n redirect
+```
+
+## Server Components vs Client Components
+```
+Karar Agaci:
+├── Veri cekme (DB/API)?           -> Server Component (varsayilan)
+├── Kullanici etkilesimi (onClick)? -> 'use client'
+├── Browser API (localStorage)?     -> 'use client'
+├── State / hooks (useState)?       -> 'use client'
+├── Statik icerik / layout?         -> Server Component
+├── Form submission?                -> Server Action
+```
+```tsx
+async function InventoryPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  const { q } = await searchParams
+  const items = await prisma.item.findMany({
+    where: q ? { name: { contains: q, mode: 'insensitive' } } : undefined,
+    orderBy: { createdAt: 'desc' },
+    take: 50,
+  })
+  return (
+    <PageContainer title="Envanter">
+      <SearchBar defaultValue={q} />
+      <Suspense fallback={<TableSkeleton rows={10} />}>
+        <InventoryTable items={items} />
+      </Suspense>
+    </PageContainer>
+  )
+}
+```
+
+## Server Actions (Mutations)
+```tsx
+'use server'
+import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
+import { z } from 'zod'
+
+const createSchema = z.object({
+  name: z.string().min(1).max(200),
+  sku: z.string().regex(/^[A-Z]{2,4}-\d{3,6}$/),
+  quantity: z.number().int().nonnegative(),
+  warehouseId: z.string().uuid(),
+})
+
+export async function createItem(formData: FormData) {
+  const session = await auth()
+  if (!session?.user) throw new Error('Unauthorized')
+
+  const parsed = createSchema.safeParse({
+    name: formData.get('name'),
+    sku: formData.get('sku'),
+    quantity: Number(formData.get('quantity')),
+    warehouseId: formData.get('warehouseId'),
+  })
+  if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
+
+  await prisma.item.create({ data: { ...parsed.data, tenantId: session.user.tenantId } })
+  revalidatePath('/inventory')
+  redirect('/inventory')
+}
+```
+
+## Data Fetching Stratejileri
+```
+├── Liste/detay?           -> Server Component + Prisma/fetch
+├── Statik icerik?         -> generateStaticParams + ISR (revalidate: 60)
+├── Dis API?               -> Route Handler (app/api/*)
+├── Client-side realtime?  -> TanStack Query / SWR ('use client')
+├── Form mutation?         -> Server Action + revalidatePath/revalidateTag
+```
+
+## State Yonetimi
+```
+Server state    -> React Server Components (DB'den dogrudan)
+URL state       -> searchParams, useSearchParams (filtre, sayfa, siralama)
+Form state      -> useActionState + Server Actions
+Client UI state -> Zustand veya Jotai (minimal — sidebar, theme, modal)
+Realtime state  -> TanStack Query ile polling veya WebSocket
+```
+
+## Database: Prisma ORM
+```prisma
+model Item {
+  id          String   @id @default(cuid())
+  tenantId    String   @map("tenant_id")
+  name        String   @db.VarChar(200)
+  sku         String   @unique
+  quantity    Int      @default(0)
+  isActive    Boolean  @default(true) @map("is_active")
+  warehouseId String   @map("warehouse_id")
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  @@index([tenantId])
+  @@map("items")
+}
+```
+- **Connection pooling:** Serverless → Prisma Accelerate veya PgBouncer; edge → `@prisma/adapter-neon`
+- **Migration:** `npx prisma migrate dev --name add_items` — elle SQL YAZMA
+- **Select:** `select: { id: true, name: true }` — tum tabloyu cekme; N+1 icin `include` kullan
+
+## Auth: NextAuth.js v5
+- `PrismaAdapter` ile DB-backed session/user
+- `Credentials` provider: email/password; JWT callback ile `tenantId`, `role` token'a ekle
+- `middleware.ts`: `export { auth as middleware } from '@/auth'` — tum route'lari koruma
+- Session callback: `token.sub` → `session.user.id`; custom claim'ler (tenantId, role) session'a tasi
+- ASLA secret'i client'a gonderme; `NEXTAUTH_SECRET` sadece server-side
+
+## Test Stratejisi
+```
+├── Server Action / util?       -> Vitest (unit)
+├── Client component?           -> Vitest + React Testing Library
+├── API Route Handler?          -> Vitest + MSW
+├── Full user flow?             -> Playwright (E2E)
+```
+```typescript
+describe('createItem', () => {
+  it('should reject invalid SKU', async () => {
+    const formData = new FormData()
+    formData.set('name', 'Test Item')
+    formData.set('sku', 'invalid')
+    formData.set('quantity', '10')
+    formData.set('warehouseId', crypto.randomUUID())
+    const result = await createItem(formData)
+    expect(result?.error?.sku).toBeDefined()
+  })
+})
+```
+
+## Naming Conventions
+| Oge | Format | Ornek |
+|-----|--------|-------|
+| Route klasoru | kebab-case | `inventory-items/` |
+| Page / Layout | lowercase | `page.tsx`, `layout.tsx` |
+| Component dosya | PascalCase | `InventoryTable.tsx` |
+| Server Action | camelCase | `inventoryActions.ts` |
+| Prisma model | PascalCase singular | `Item`, `Warehouse` |
+| DB table (`@@map`) | snake_case plural | `items`, `warehouses` |
+| DB column (`@map`) | snake_case | `tenant_id`, `created_at` |
+| Env variable | UPPER_SNAKE_CASE | `DATABASE_URL`, `NEXTAUTH_SECRET` |
+
+## Anti-Pattern'ler
+| Anti-Pattern | Dogru Yaklasim |
+|---|---|
+| Her component'e `'use client'` | Varsayilan Server Component; sadece interaksiyon gerekiyorsa client |
+| Client Component'te DB cagrisi | Server Component veya Server Action kullan |
+| `fetch` + `useEffect` (client) | Server Component fetch veya TanStack Query |
+| Route Handler her CRUD icin | Server Actions; Route Handler sadece webhook/dis API |
+| `getServerSideProps` (Pages Router) | App Router + async Server Component |
+| `router.push` sonrasi cache stale | `revalidatePath()` / `revalidateTag()` Server Action icinde |
+| Prisma client global'de birden fazla | Singleton: `globalThis.prisma ??= new PrismaClient()` |
+| Middleware'de agir islem (DB call) | Middleware hafif: JWT decode + redirect; DB → route/action |
+| `any` type Server Action return | Zod schema + typed return `{ error: FieldErrors }` |
+| Secret'lari client bundle'a koyma | `NEXT_PUBLIC_` SADECE public degerler; secret `.env.local` + server-only |
+| Layout icinde searchParams kullanma | `searchParams` sadece `page.tsx`; layout'a prop veya client hook |
+
+## Performans Hedefleri
+| Metrik | Hedef |
+|--------|-------|
+| FCP | < 1.5s (RSC ile) |
+| LCP | < 2.5s |
+| CLS | < 0.1 |
+| TTFB | < 200ms (edge runtime ile < 100ms) |
+| Initial JS bundle | < 100KB gzip (RSC zero-bundle avantaji) |
+| Prisma query | < 50ms P95 (select + index ile) |
+| Build time | Turbopack dev: < 500ms HMR |
+| Lighthouse score | > 90 (performance, a11y, best practices) |
