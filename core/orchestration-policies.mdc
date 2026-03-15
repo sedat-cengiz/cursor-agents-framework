@@ -318,6 +318,79 @@ GONDERME:
 
 ---
 
+## PARALEL ADIM BAGIMLILIK YONETIMI
+
+Paralel calisan agent'lar (ornegin `backend ∥ frontend`) birbirinin **ciktisini beklemez**. Ortak bagimlilik **API/event kontrati**dir.
+
+### Kontrat-once (Contract-first) Kurali
+- Paralel adimdan ONCE kontrat uretilmis olmali (mimari / G3 veya analist ciktisi).
+- Kontrat: `docs/agents/contracts/` altinda endpoint, request/response, hata kodlari, opsiyonel ornek payload.
+- Yeni endpoint veya veri modeli degisikligi varsa G3 Mimari Kapisi zorunlu veya tetiklenir; kontrat G3'te onaylanir.
+
+### Frontend API yokken nasil calisir?
+| Durum | Frontend davranisi |
+|-------|---------------------|
+| Kontrat var, API yok | Kontrata gore tip/interface uretir; MSW, mock servis veya contract stub ile cagriyi taklit eder; UI ve state yonetimini tamamlar. Gercek API sonra baglanir. |
+| Kontrat yok | Paralel adim baslamaz — once mimari/analist ile kontrat uretilir, G3 gecer, sonra backend ∥ frontend. |
+
+### Backend–Frontend bulusma noktasi
+- Her iki agent bittiginde: G4 Uygulama Kapisi hem build hem **kontrat uyumu** kontrol eder.
+- QA: contract test (Pact vb.) ile provider/consumer uyumunu dogrular.
+- Uyumsuzluk varsa ilgili agent'a duzeltme handoff'u ile geri gonderilir (Hata Politikasi).
+
+### Paralel Adim Yurutme Proseduru (Sef icin)
+1. **Tespit:** Mevcut adim bir paralel grup mu? (Hat diyagraminda `∥` ile ayrilmis agent'lar.)
+2. **Hazirlik:** Gruptaki her agent icin filtrelenmis handoff yaz; hepsinde ayni is ID, kontrat referansi ve ilgili teknik baglam olsun.
+3. **Cagri:** Her iki (veya tum) agent'i ayni turda tetikle; ortam paralel cagri destekliyorsa paralel, degilse sirayla cagir ve ciktilari topla.
+4. **Bulusma:** Tum ciktilar gelene kadar bekle; sonra tek seferde dogrula (G4 kontrat uyumu dahil), state guncelle, kapi kontrol et.
+5. **Hata:** Gruptan biri KALDI alirsa sadece o agent'a geri gonder; digerlerinin ciktisi state'te saklanir, tekrar cagrilmaz.
+
+### Ozet
+- **API yoksa frontend calisabilir mi?** Evet — kontrat varsa; frontend kontrat + mock ile calisir.
+- **Birbirini bekleyen isler:** Kontrat tek ortak bagimliliktir; paralel adimlar kontrati bekler, birbirlerini beklemez.
+
+---
+
+## DEFINITION OF READY (DoR)
+
+Her kalite kapisi veya agent adimina girmeden once asagidaki "hazir mi?" kriterleri kontrol edilir. Eksik varsa once eksik giderilir, sonra adim baslar.
+
+### G1 Analiz Kapisi — Giris DoR
+- [ ] Kullanici istegi net (en az 1-2 cumle, ne isteniyor belli)
+- [ ] Etkilenen alan/modul kabaca belli (yoksa analist once kapsam netlestirir)
+
+### G2 Kabul Kapisi — Giris DoR
+- [ ] Analiz tamamlandi; US veya kabul kriterleri taslagi var
+- [ ] Kapsam (S/M/L/XL) ve risk (dusuk/orta/yuksek/kritik) belirlendi
+- [ ] Kullanici onayi alindi (G1 gecti)
+
+### G3 Mimari Kapisi — Giris DoR
+- [ ] US veya gereksinim onayli (G2 gecti)
+- [ ] Yeni API / veri modeli / bounded context ihtiyaci net (mimari tetikleyici)
+- [ ] Mevcut kontratlar ve ADR'lar ilgili agent'a handoff'ta referans verildi
+
+### G4 Uygulama Kapisi (backend / frontend handoff oncesi) — DoR
+- [ ] Bu adim icin kontrat veya ADR referansi handoff'ta var (paralel adimlarda zorunlu)
+- [ ] Bu agent icin DoD maddeleri handoff'ta yazili
+- [ ] Ilgili requirements/ ve contracts/ dosyalari belirtildi
+
+### G5 Test Kapisi — Giris DoR
+- [ ] Uygulama adimi tamamlandi (G4 gecti)
+- [ ] Test edilecek scope (endpoint, component, akis) net
+
+### G6 Review Kapisi — Giris DoR
+- [ ] Testler gecti (G5 gecti)
+- [ ] Review kapsami (degisen dosyalar, risk alanlari) state'te guncel
+
+### G7 Yayin Kapisi — Giris DoR
+- [ ] Review gecti (G6 gecti)
+- [ ] DoD checklist workflow-state veya taskboard'da gorunur
+- [ ] Kullanici onayi icin hazir (demo/gosterim plani)
+
+**Kullanim:** Sef her adimda once ilgili DoR maddelerini kontrol eder; eksik varsa once eksigi giderir (kullaniciya sor, eksik handoff tamamla), sonra agent cagirir veya kapiyi degerlendirir.
+
+---
+
 ## BUYUK PROJE DAYANIKLILIK KURALLARI
 
 ### Bounded Context Farkindaligi

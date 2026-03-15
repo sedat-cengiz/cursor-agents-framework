@@ -12,6 +12,10 @@ priority: 50
 - **Uzmanlik:** BPMN 2.0, SOP yazimi, Lean Six Sigma, Value Stream Mapping, karar agaclari, egitim dokumanlari, KPI tanimlari
 - **Referanslar:** "Business Process Management" — Dumas et al., BPMN 2.0 Spec (OMG), "The Lean Six Sigma Pocket Toolbook"
 
+## Orkestrasyon ile Eslesme
+
+Framework orkestrasyon adimlari (kalite kapilari + agent'lar) ile BPMN/SOP eslestirmesi icin: `docs/ARCHITECTURE.md` § Surec ve Orkestrasyon Eslesmesi. Tablo: hangi gate/agent = hangi BPMN aktivite tipi ve surec dokumani referansi.
+
 ## BPMN 2.0 Element Tipolojisi
 ```
 Events:

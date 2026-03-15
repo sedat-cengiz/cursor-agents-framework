@@ -134,6 +134,28 @@ agents.manifest.json  ─── Proje: hangi paketler aktif?
             └── reviews/                 ← Code review raporlari
 ```
 
+## Surec ve Orkestrasyon Eslesmesi
+
+Framework orkestrasyonu (kalite kapilari + agent adimlari) ile surec dokumantasyonu (BPMN/SOP) tek bir referansla eslestirilebilir. Denetim veya uyumluluk raporu icin asagidaki tablo kullanilir.
+
+| Orkestrasyon Adimi | Kalite Kapisi | BPMN Karsiligi | Surec Dokumani Referansi |
+|--------------------|---------------|----------------|--------------------------|
+| Kullanici istegi al | — | Start Event (Message) | process-documentation.mdc: BPMN Start |
+| Analiz, siniflandirma | G1 Analiz | Task (User: Sef) | SOP: Is kabulu, kapsam belirleme |
+| US / kabul kriterleri | G2 Kabul | Task (User: Analist) | process-analysis.mdc: US, INVEST |
+| Mimari / ADR / kontrat | G3 Mimari | Task (User: Mimari) | process-architecture.mdc: ADR, kontrat |
+| Backend gelistirme | G4 Uygulama | Task (Service: Backend) | tech-* backend pack |
+| Frontend gelistirme | G4 Uygulama | Task (Service: Frontend) | tech-* frontend pack |
+| backend ∥ frontend | G4 Uygulama | Parallel Gateway (AND) → 2 Task | orchestration-policies: Paralel adim |
+| Test yazimi / calistirma | G5 Test | Task (Service: QA) | tech-testing.mdc |
+| Code review | G6 Review | Task (User: Review) | code-quality.mdc |
+| DoD onay, yayin | G7 Yayin | Task (User: Sef + Kullanici) | orchestrator.mdc: Final ozet |
+| Final ozet kullaniciya | — | End Event | — |
+
+**Kullanim:** Proje `docs/processes/` veya `docs/sop/` altinda BPMN/SOP tutuyorsa, yukaridaki adimlari ayni isimle veya referans numarasi ile eslestir. CMMI/ISO surec uyumlulugu icin "orkestrasyon adimi X = SOP-Y Adim Z" seklinde matris olusturulabilir.
+
+---
+
 ## Tasarim Prensipleri
 
 1. **Separation of Concerns**: Her katman kendi sorumluluk alanina sahip; katmanlar arasi bagimlilik minimal.

@@ -169,6 +169,31 @@ Error Budget = 1 - SLO
 4. Mean Time to Recover: < 1 saat
 ```
 
+## Observability ve SRE — Framework Entegrasyonu (Opsiyonel)
+
+Production-critical veya buyuk projelerde asagidaki kurallar goz onune alinir. Framework bunlari zorunlu tutmaz; proje manifest'inde veya release kriterlerinde istege bagli uygulanir.
+
+### Kritik Akis Icin Zorunluluklar
+- **Structured log:** Kritik islem (siparis, odeme, stok rezervasyon) basinda/sonunda structured log; CorrelationId/TraceId tum span'lerde propagate.
+- **Metrik:** Yeni dis API veya yeni DB baglantisi eklendiginde ilgili latency ve error rate metrigi tanimla (OpenTelemetry veya mevcut stack).
+- **Health check:** Yeni bagimlilik (DB, cache, message broker) eklendiginde `/health` (veya `/health/ready`) endpoint'ine ekle.
+
+### Alert Beklentisi
+| Degisiklik Turu | Beklenen Kontrol |
+|-----------------|------------------|
+| Yeni dis API cagrisi | Timeout, error rate, optional circuit breaker metrigi |
+| Yeni DB / migration | Connection pool, query latency, failure count |
+| Yeni kuyruk / message broker | Consumer lag, dead-letter, throughput |
+| Auth/guvenlik degisikligi | Failed auth rate, lockout metrigi |
+
+### Postmortem Sablonu (Incident Sonrasi)
+Incident cozuldukten sonra dokumante et: **Ne oldu?** (ozet), **Kok neden**, **Etki (kullanici/sure)**, **Cozum adimlari**, **Onleyici aksiyonlar** (kod/config/process), **Tarih**. Dosya: `docs/incidents/postmortem-YYYY-MM-DD-{kisa-isim}.md`. Bir sonraki release'te onleyici aksiyonlar tamamlanmadan kapatma.
+
+### Ozet
+- Log/span/metrik: kritik akista zorunlu; yeni bagimlilikta health + metrik ekle.
+- Alert: SLO/error budget ile uyumlu; gereksiz alert ekleme (alert fatigue onleme).
+- Postmortem: incident sonrasi zorunlu; onleyici aksiyon takip edilir.
+
 ## Environment Configuration
 ```
 ENV Variables (12-Factor):

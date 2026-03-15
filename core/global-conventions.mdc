@@ -107,6 +107,20 @@ priority: 10
 - Frontend FCP: < 2.5s
 - Frontend Bundle: < 500KB gzip
 
+## Delivery Metrikleri (DORA Uyumlu — Opsiyonel)
+
+Proje manifest'inde `deliveryMetrics` tanimlanirsa asagidaki hedefler raporlama ve iyilestirme icin kullanilir. Framework bu metrikleri zorunlu tutmaz; takim kendi tool'lari ile olcer.
+
+| Metrik | Manifest alani | Aciklama |
+|--------|----------------|----------|
+| **Deployment frequency** | `deploymentFrequency` | Hedef: per-sprint, weekly, on-demand |
+| **Lead time** | `leadTimeTargetDays` | Is baslangicindan production'a kadar (gun) |
+| **MTTR** | `mttrTargetHours` | Incident'ten toparlanma suresi (saat) |
+| **Change failure rate** | `changeFailureRateTargetPercent` | Deploy sonrasi rollback/hotfix orani (%) |
+
+Ornek (manifest): `"deliveryMetrics": { "deploymentFrequency": "per-sprint", "leadTimeTargetDays": 5, "mttrTargetHours": 4, "changeFailureRateTargetPercent": 15 }`
+Final ozet veya sprint kapanisinda bu hedefler karsilaniyor mu gozden gecirilebilir.
+
 ---
 
 ## Logging Standartlari

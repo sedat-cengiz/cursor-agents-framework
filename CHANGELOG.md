@@ -4,6 +4,20 @@ All notable changes to the Cursor Agents Framework are documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.0] - 2026-03-15
+
+### Added (upper-tier best practices)
+- **Parallel execution protocol** (`orchestrator.mdc` § 4.2a, `orchestration-policies.mdc`): Procedure for running ∥ steps (e.g. backend ∥ frontend) — prepare handoffs, trigger both agents (same turn or sequentially), join at completion, then validate/state/gate once; failure handling per agent without re-running the whole group.
+- **Definition of Ready (DoR)** (`orchestration-policies.mdc`): Entry criteria per gate (G1–G7) and before backend/frontend handoff; Sef checks DoR before each step; reference from orchestrator § 4.5.
+- **DORA-aligned delivery metrics** (optional): `agents.manifest.schema.json` — new optional `deliveryMetrics` block (`deploymentFrequency`, `leadTimeTargetDays`, `mttrTargetHours`, `changeFailureRateTargetPercent`); `global-conventions.mdc` — "Delivery Metrikleri (DORA Uyumlu)" section for reporting and improvement (not enforced by framework).
+- **Process–orchestration mapping** (`docs/ARCHITECTURE.md`): New section "Surec ve Orkestrasyon Eslesmesi" — table mapping gates/agents to BPMN activity types and process doc references; `process-documentation.mdc` — short pointer to this table for compliance/audit.
+- **Observability & SRE (optional)** (`tech-devops.mdc`): New section "Observability ve SRE — Framework Entegrasyonu" — critical flow logging/span/metric, alert expectations per change type, postmortem template, health-check rule for new dependencies.
+
+### Changed
+- `orchestrator.mdc`: Gate check (§ 4.5) now references DoR; § 4.2 extended with 4.2a parallel step procedure.
+
+---
+
 ## [4.0.0] - 2026-03-15
 
 ### Added

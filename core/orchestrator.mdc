@@ -107,6 +107,12 @@ analist → [KABUL KAPISI] → mimari(?) → [MIMARI KAPISI] → backend ∥ fro
 - `mimari` tetikleyici: kapsam L/XL VEYA yeni API endpoint VEYA yeni bounded context VEYA veri modeli degisikligi
 - `devops` tetikleyici: yeni servis, pipeline degisikligi veya deployment config gerekiyorsa
 
+**Paralel adimlarda bagimlilik (backend ∥ frontend):** Birbirini bekleyen isler kontrat uzerinden yonetilir. API henuz yazilmamis olsa bile frontend calisabilir:
+1. **Kontrat onceden tanimlanir:** Paralel adimdan ONCE mimari (veya analist) `docs/agents/contracts/` icinde API kontrati (endpoint, request/response, hata kodlari) uretir; G3 Mimari Kapisi bu kontrati dogrular.
+2. **Frontend kontrat + mock ile calisir:** Gercek backend endpoint hazir olmasa da frontend, kontrat dokumanina gore tip/interface uretir, mock servis veya MSW/contract stub ile UI ve entegrasyon kodunu yazar.
+3. **Backend ayni kontrata gore implement eder:** Backend kontrati kaynak alir; frontend ile gercek API ayni kontrata uyumlu olur.
+4. **Bulusma noktasi:** Her iki taraf tamamlaninca G4 Uygulama Kapisi kontrat uyumunu kontrol eder; QA contract test (ornegin Pact) ile dogrular. Boylece ne backend frontend'i ne frontend backend'i bekler — ortak bagimlilik sadece kontrattir.
+
 #### bugfix (Hata Duzeltme)
 ```
 [ilgili teknik agent] → [UYGULAMA KAPISI] → qa → [TEST KAPISI] → review → [REVIEW KAPISI]
@@ -240,6 +246,12 @@ Subagent cagrisinda belirt:
 3. Workspace path
 4. Okunmasi gereken dokumanlar (requirements, contracts, decisions)
 
+**4.2a. Paralel adimlar (∥):** Hat diyagraminda `∥` ile gosterilen adimlar (ornegin backend ∥ frontend) **ayni anda** yurutulur:
+1. Her paralel agent icin ayri handoff hazirla (4.1); ortak bagimlilik kontrat olmali (bkz. `orchestration-policies.mdc` § Paralel adim bagimliligi).
+2. Her iki (veya daha fazla) agent'i **ayni turda** cagir — Cursor ortami paralel subagent destekliyorsa (ornegin `mcp_task` ile coklu cagri) ayni anda baslat; desteklemiyorsa sirayla cagirip sonuclari topla.
+3. **Bulusma:** Tum paralel agent'lar tamamlanana kadar sonuc bekle; hepsi bittikten sonra tek seferde 4.3 (Ciktiyi Dogrula), 4.4 (State Guncelle), 4.5 (Kapi Kontrol) uygula.
+4. Paralel grupta bir agent basarisiz olursa Hata Politikasi o agent icin uygulanir; duzeltme sonrasi gerekirse sadece o agent tekrar cagrilir, digerleri bekletilmez (state'te durum guncel tutulur).
+
 ### 4.3. Ciktiyi Dogrula
 
 Agent ciktisini asagidaki kontrol listesine gore dogrula:
@@ -262,6 +274,7 @@ Her adim sonrasi `docs/agents/workflow-state.md` dosyasini guncelle:
 ### 4.5. Kapi Kontrol Et
 
 Mevcut adim bir kapi oncesi ise, kapi kriterlerini kontrol et.
+**Giris DoR:** Kapıya girmeden once ilgili DoR maddelerini kontrol et (bkz. `orchestration-policies.mdc` § Definition of Ready); eksik varsa once giderilir.
 Gecti → sonraki adim. Kaldi → basarisizlik aksiyonu.
 
 ---

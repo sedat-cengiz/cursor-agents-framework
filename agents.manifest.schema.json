@@ -232,6 +232,34 @@
         }
       },
       "additionalProperties": false
+    },
+    "deliveryMetrics": {
+      "type": "object",
+      "description": "Optional DORA-aligned delivery targets. Used for reporting and improvement; not enforced by framework.",
+      "properties": {
+        "deploymentFrequency": {
+          "type": "string",
+          "description": "Target deployment frequency (e.g. per sprint, weekly, on-demand)",
+          "examples": ["per-sprint", "weekly", "on-demand"]
+        },
+        "leadTimeTargetDays": {
+          "type": "number",
+          "description": "Target lead time from work start to production (days)",
+          "minimum": 0
+        },
+        "mttrTargetHours": {
+          "type": "number",
+          "description": "Target mean time to recover from incident (hours)",
+          "minimum": 0
+        },
+        "changeFailureRateTargetPercent": {
+          "type": "number",
+          "description": "Target max % of deployments causing rollback or hotfix",
+          "minimum": 0,
+          "maximum": 100
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false
