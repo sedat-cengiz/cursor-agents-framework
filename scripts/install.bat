@@ -11,7 +11,7 @@ set "TARGET_PATH=%PROJECT_PATH%\.cursor\rules"
 echo.
 echo  ╔══════════════════════════════════════════════╗
 echo  ║  Cursor Agents Framework — Project Setup     ║
-echo  ║  Modular Multi-Agent System v3.0             ║
+echo  ║  Modular Multi-Agent System v4.0             ║
 echo  ╚══════════════════════════════════════════════╝
 echo.
 echo  Framework: %FRAMEWORK_PATH%

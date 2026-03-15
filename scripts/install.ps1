@@ -25,7 +25,7 @@ $FrameworkPath = Split-Path -Parent $PSScriptRoot
 Write-Host ""
 Write-Host "  ╔══════════════════════════════════════════════╗" -ForegroundColor Cyan
 Write-Host "  ║  Cursor Agents Framework — Project Setup     ║" -ForegroundColor Cyan
-Write-Host "  ║  Modular Multi-Agent System v3.0             ║" -ForegroundColor Cyan
+Write-Host "  ║  Modular Multi-Agent System v4.0             ║" -ForegroundColor Cyan
 Write-Host "  ╚══════════════════════════════════════════════╝" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  Framework: $FrameworkPath"
@@ -58,7 +58,7 @@ if ($ManifestPath -and (Test-Path $ManifestPath)) {
 # ═══════════════════════════════════════
 Write-Host "  [1/6] Core rules..." -ForegroundColor Yellow
 Copy-Item (Join-Path $FrameworkPath "core" "*.mdc") $TargetRules -Force
-Write-Host "        > global-conventions, orchestrator, code-quality" -ForegroundColor Green
+Write-Host "        > global-conventions, orchestrator, orchestration-policies, code-quality" -ForegroundColor Green
 
 # ═══════════════════════════════════════
 # STEP 2: Technology

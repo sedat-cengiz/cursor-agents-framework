@@ -51,7 +51,7 @@ Agent'lar gorevleri sirasinda elde ettikleri ogrenmeleri yapilandirilmis formatt
 4. Anti-pattern'lerden kacin, best practice'leri uygula
 
 ### Global Bilgi Erisimi
-Global bilgi: `~/.cursor/skills/jeager-agents/v2/learning/knowledge-base/lessons-learned.md`
+Global bilgi: `~/.cursor/skills/cursor-agents-framework/learning/knowledge-base/lessons-learned.md`
 
 ## Evrensel Ders Yayilimi
 Ders "Evrensel" ise:
@@ -70,7 +70,7 @@ Her 5-10 evrensel ders biriktiginde:
 Isi yapan agent gorevi "tamamladim" demeden once su kontrolu yapsin:
 1. **Bu gorevde yeni bir sey kesfettim mi?** (beklenmeyen hata cozumu, unutulan checklist maddesi, yanlis pattern kullanimi duzeltmesi)
 2. **Evet ise:** `docs/agents/lessons-learned.md` dosyasina yukaridaki formatta kayit ekle. "Uygulama" alaninda somut ol: "tech-dotnet.mdc Multi-Tenancy bolumune su madde eklenebilir: ..."
-3. **Evrensel ise:** Ayni dersi `~/.cursor/skills/jeager-agents/v2/learning/knowledge-base/lessons-learned.md` dosyasina da ekle (veya "v2 knowledge-base'e tasinmali" notu dus).
+3. **Evrensel ise:** Ayni dersi `~/.cursor/skills/cursor-agents-framework/learning/knowledge-base/lessons-learned.md` dosyasina da ekle (veya "global knowledge-base'e tasinmali" notu dus).
 4. **Kural guncellemesi gerekiyorsa:** "Uygulama"da hangi .mdc dosyasina ne eklenecegini yaz; ileride v2 guncellemesinde kullanilsin.
 
 Boylece her gorev sonrasi ogrenme tek bir adimda kayda gecer; unutma azalir.

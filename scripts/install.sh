@@ -11,7 +11,7 @@ FRAMEWORK_PATH="$(cd "$(dirname "$0")/.." && pwd)"
 echo ""
 echo "  ╔══════════════════════════════════════════════╗"
 echo "  ║  Cursor Agents Framework — Project Setup     ║"
-echo "  ║  Modular Multi-Agent System v3.0             ║"
+echo "  ║  Modular Multi-Agent System v4.0             ║"
 echo "  ╚══════════════════════════════════════════════╝"
 echo ""
 echo "  Framework: $FRAMEWORK_PATH"
@@ -40,7 +40,7 @@ fi
 # ═══════════════════════════════════════
 echo "  [1/6] Core rules..."
 cp -f "$FRAMEWORK_PATH"/core/*.mdc "$TARGET_RULES/"
-echo "        ✓ global-conventions, orchestrator, code-quality"
+echo "        ✓ global-conventions, orchestrator, orchestration-policies, code-quality"
 
 # ═══════════════════════════════════════
 # STEP 2: Technology

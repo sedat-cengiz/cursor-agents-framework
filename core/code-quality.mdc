@@ -1,5 +1,5 @@
 ---
-description: "Kod kalitesi denetimi — 360 derece review, complexity metrics, guvenlik, PR checklist, breaking change — teknoloji bagimsiz"
+description: "Kod kalitesi denetimi — 360 derece review, complexity metrics, guvenlik, PR checklist, breaking change, kalite kapisi entegrasyonu — teknoloji bagimsiz"
 globs: 
 alwaysApply: true
 priority: 20
@@ -190,12 +190,18 @@ Tablo/koleksiyon ismi degismis → BREAKING (rename + alias)
 - [ ] Input validation (server-side) mevcut mu? Tip, uzunluk, whitelist kontrol?
 - [ ] Tenant izolasyonu (multi-tenancy) saglanmis mi?
 - [ ] N+1 query riski var mi? Read-only sorgularda optimizasyon?
-- [ ] Katman mimarisi kurallari ihlal edilmemis mi?
+- [ ] Katman mimarisi kurallari ihlal edilmemis mi? (Domain → Infrastructure referans YOK)
+- [ ] Service/Application/Domain katman sinirlari net mi? Is mantigi controller/handler'da degil mi?
 - [ ] Injection korunmasi: parametreli sorgu; raw string birlestirme yok?
 - [ ] Exception yutulmuyor mu? (catch bloklarinda log + rethrow veya anlamli hata donusu)
+- [ ] Hata yonetimi tutarli mi? (Domain exception → 422, Validation → 400, Auth → 401/403)
+- [ ] Retry/timeout: dis servis cagrilarinda resilience pattern uygulanmis mi?
 - [ ] Unit test (happy path + error path)? Kritik akis integration testte mi?
 - [ ] Cognitive complexity < 15?
-- [ ] DB migration/schema degisikligi varsa backward compatible mi?
+- [ ] DB migration/schema degisikligi varsa backward compatible mi? (2-phase migration?)
+- [ ] Logging: kritik islemde structured log var mi? PII loglanmiyor mu?
+- [ ] API kontrat uyumu: uygulama kontrat dosyasiyla eslesiyor mu?
+- [ ] Backward compatibility: mevcut consumer'lari kiran degisiklik var mi?
 
 ### Frontend PR
 - [ ] Type safety: loosely-typed (`any`, `object`) kullanilmamis mi?
@@ -205,7 +211,13 @@ Tablo/koleksiyon ismi degismis → BREAKING (rename + alias)
 - [ ] i18n — hardcoded string yok mu?
 - [ ] Accessibility: form label, buton/link anlamli metin, klavye navigasyon, ARIA?
 - [ ] Error handling: kullaniciya hata gosterimi ve boundary var mi?
-- [ ] Bundle size etkisi kontrol edilmis mi?
+- [ ] Loading / empty / error state'leri tanimli mi? (skeleton, empty state, error boundary)
+- [ ] Tasarim tutarliligi: mevcut component library/design system kullaniliyor mu?
+- [ ] Component yeniden kullanimi: benzer component zaten var mi? Gereksiz tekrar yok mu?
+- [ ] Responsive davranis: mobil ve tablet gorunumu dusunulmus mu?
+- [ ] UX butunlugu: kullanici akisi tutarli mi? Beklenmedik davranis yok mu?
+- [ ] Bundle size etkisi kontrol edilmis mi? Lazy loading gerekli mi?
+- [ ] Performance: gereksiz API cagrisi, buyuk liste render (virtualization gerekli mi?)
 
 ### Cross-Cutting
 - [ ] API kontrat: request/response dokuman ile uyumlu mu? Breaking change varsa dokumante mi?
@@ -230,6 +242,32 @@ Tablo/koleksiyon ismi degismis → BREAKING (rename + alias)
 - **Dersler:** `docs/agents/lessons-learned.md` — tekrarlanan hatalari kontrol et.
 
 Bu baglamdan sonra 360-Derece Review Boyutlari ve Karar Agaci ile sistematik inceleme yap.
+
+---
+
+## Kalite Kapisi Entegrasyonu
+
+Code Review agent'i orkestrasyon akisinda **G6 Review Kapisi** olarak calisir.
+
+### Review Oncesi
+1. `workflow-state.md` oku — is turu, kapsam, risk seviyesi
+2. Ilgili handoff dosyasini oku — bu adim icin beklenen cikti ve DoD
+3. Risk seviyesi yuksek/kritik ise: guvenlik review ZORUNLU (security agent ile)
+
+### Review Sonrasi Karar
+| Sonuc | Kapi Durumu | Aksiyon |
+|-------|-------------|---------|
+| ONAYLANDI (MUST-FIX yok) | G6 GECTI | Orkestratora bildir, sonraki adim |
+| KUCUK DUZELTME (SHOULD-FIX var) | G6 UYARI | Orkestratora bildir, duzeltme listesi ile devam |
+| REVIZYON GEREKLI (MUST-FIX var) | G6 KALDI | Orkestratora bildir, ilgili agent'a geri gonderilir |
+
+### Review Raporu Ek Alanlari
+Review raporuna asagidaki alanlar eklenir:
+- **Is:** WORK-XXX
+- **Kapi:** G6 Review
+- **Karar:** GECTI / UYARI / KALDI
+- **Mimari Ihlal:** var/yok (varsa → DURDUR tetikleyebilir)
+- **Guvenlik Riski:** var/yok (varsa → DURDUR tetikleyebilir)
 
 ---
 

@@ -1,0 +1,341 @@
+---
+description: "Orkestrasyon Politikalari — Hata yonetimi, context filtreleme, kalite kapisi kriterleri — orchestrator.mdc ile birlikte calisir"
+globs: 
+alwaysApply: true
+priority: 16
+---
+
+# Orkestrasyon Politikalari
+
+> Bu dosya `orchestrator.mdc` ile birlikte calisir. Sef karar verirken bu politikalari otomatik uygular.
+> Kullanici bu dosyayi dogrudan cagirmaz; @sef uzerinden otomatik isletilir.
+
+---
+
+## HATA POLITIKASI
+
+### Hata Taksonomisi
+
+| Hata Turu | Tanim | Ornek |
+|-----------|-------|-------|
+| `format_error` | Agent ciktisi beklenen formatta degil | Handoff sablonuna uymuyor, eksik bolum |
+| `missing_output` | Beklenen cikti uretilmedi | US dosyasi yazilmadi, test eklenmedi |
+| `logic_inconsistency` | Cikti icinde veya onceki adimlarla celiskili mantik | API kontrat ile uygulama uyumsuz |
+| `architecture_violation` | Katman ihlali, bagimlilik yonu hatasi, pattern ihlali | Domain katmani Infrastructure'a referans veriyor |
+| `test_failure` | Testler basarisiz veya yetersiz coverage | Unit testler kirmizi, coverage %40 |
+| `security_risk` | Guvenlik acigi veya risk tespit edildi | SQL injection, hardcoded secret, PII loglama |
+| `insufficient_context` | Agent gorevi icin yeterli bilgiye sahip degil | Gereksinim belirsiz, teknik karar eksik |
+
+### Risk Seviyesine Gore Yeniden Deneme Matrisi
+
+| Risk Seviyesi | Max Retry | Basarisizlik Sonrasi Aksiyon |
+|---------------|-----------|------------------------------|
+| **dusuk** | 2 | 2 denemede basarisiz → UYARI + devam et |
+| **orta** | 1 | 1 denemede basarisiz → ESKALASYON (kullaniciya bildir) |
+| **yuksek** | 0 | Retry YOK → dogrudan ESKALASYON |
+| **kritik** | 0 | Retry YOK → DURDUR + kullaniciya rapor |
+
+### Hata Turune Gore Ozel Aksiyon
+
+| Hata Turu | Ilk Aksiyon | Retry Sonrasi |
+|-----------|-------------|---------------|
+| `format_error` | Spesifik format talimatıyla tekrar gonder | UYARI + devam |
+| `missing_output` | Eksik ciktiyi belirterek tekrar gonder | ESKALASYON |
+| `logic_inconsistency` | Celiskiyi belirterek ilgili agent'a geri gonder | ESKALASYON |
+| `architecture_violation` | DURDUR — mimari ihlal retry ile cozulmez | KULLANICIYA BILDIR |
+| `test_failure` | Test hatasini ilgili developer'a geri gonder | ESKALASYON |
+| `security_risk` | DURDUR — guvenlik riski her zaman durur | KULLANICIYA BILDIR |
+| `insufficient_context` | KULLANICIYA SOR — eksik bilgiyi iste | DURDUR |
+
+### Zorunlu Durdurma Kosullari (HARD STOP)
+
+Asagidaki durumlardan **herhangi biri** gerceklesirse yurutme DERHAL durur:
+
+1. `security_risk` tespit edildi
+2. `architecture_violation` ve risk seviyesi yuksek/kritik
+3. Kumulatif hata sayaci **3'e** ulasti (farkli adimlar dahil)
+4. Ayni agent ayni hata turu ile **2 kez** basarisiz oldu
+5. Kullanici acikca "dur" veya "iptal" dedi
+
+Durdurma sonrasi:
+- Hata raporu olustur (`_template-failure-report.md` formatinda)
+- Mevcut state'i kaydet
+- Kullaniciya durum ozeti ver
+- Kullanici karari bekle (devam / iptal / yeniden planla)
+
+### Insan Mudahalesi Tetikleyicileri (Human-in-the-Loop)
+
+Asagidaki durumlarda agent calismaya devam ETMEZ, kullaniciya sorar:
+
+1. **Mimari ihlal** tespit edildiginde
+2. **Gereksinim belirsizligi** — agent gorevi icin yeterli bilgiye sahip degil
+3. **Kapsam degisikligi** — is siniflandirmasi sirasinda belirlenen kapsam asiliyor
+4. **Breaking change** — mevcut API veya veri modelini kirabilecek degisiklik
+5. **Risk seviyesi yukseltme** — baslangiçtaki risk degerlendirmesi degisti
+6. **Birden fazla gecerli yaklasim** — teknik karar gerekiyor, agent belirsiz
+
+---
+
+## CONTEXT FILTRE SPESIFIKASYONLARI
+
+### Prensip: Bilmesi Gereken Kadar
+
+Her agent'a sadece gorevini yapması icin gerekli bilgi gonderilir. Tum konusma gecmisi, onceki agent ciktilari veya ilgisiz teknik detaylar AKTARILMAZ.
+
+### Agent Bazinda Context Filtresi
+
+#### Is Analisti (@analist)
+```
+GONDER:
+- Kullanici istegi (ham metin)
+- Mevcut domain terimler sozlugu
+- Ilgili mevcut US'ler (ayni modul/bounded context)
+- Proje sabitleri (tenant, roller)
+- Kapsam ve risk bilgisi
+
+GONDERME:
+- Onceki teknik uygulama detaylari
+- Kod parcalari
+- CI/CD yapilandirmasi
+- Test coverage raporlari
+```
+
+#### Cozum Mimari (@mimari)
+```
+GONDER:
+- Onaylanan US ve kabul kriterleri
+- Mevcut mimari (C4, katman yapisi, bounded context'ler)
+- Mevcut API kontratlari (etkilenen endpoint'ler)
+- Veri modeli (etkilenen entity'ler)
+- Teknoloji stack bilgisi
+- Kapsam ve risk bilgisi
+- Performance hedefleri
+
+GONDERME:
+- UI/UX detaylari
+- Frontend component yapisi
+- Kullanici arastirma verileri
+```
+
+#### Backend Gelistirici (@backend)
+```
+GONDER:
+- Onaylanan US (kabul kriterleri)
+- ADR kararlari (uygulama ile ilgili)
+- API kontrat (bu sprint'te yazilacak endpoint'ler)
+- Veri modeli degisiklikleri
+- Mevcut kod yapisi (ilgili modul/servis)
+- Tech-pack kurallari
+- Bilinen kisitlar ve riskler
+
+GONDERME:
+- Is analizi sureci
+- Alternatif mimari degerlendirmeleri (sadece secilen karar)
+- Frontend uygulama detaylari
+- DevOps pipeline detaylari
+```
+
+#### Frontend Gelistirici (@frontend)
+```
+GONDER:
+- Onaylanan US (kabul kriterleri + UI davranisi)
+- API kontrat (kullanacagi endpoint'ler — request/response)
+- UI/UX gereksinimleri (varsa tasarim referansi)
+- Mevcut component yapisi (ilgili sayfa/modul)
+- Tech-pack kurallari
+- i18n/a11y gereksinimleri
+
+GONDERME:
+- Backend uygulama detaylari (domain layer, DB sema)
+- Mimari karar sureci
+- DevOps yapilandirmasi
+```
+
+#### QA Muhendisi (@qa)
+```
+GONDER:
+- Onaylanan US (kabul kriterleri — test senaryolarina kaynak)
+- API kontrat (test edilecek endpoint'ler)
+- Degisen dosya/modul listesi
+- Bilinen edge case'ler ve riskler
+- Mevcut test altyapisi bilgisi
+- Coverage hedefleri
+
+GONDERME:
+- Mimari karar sureci
+- UI tasarim detaylari
+- Domain modelleme tartismalari
+```
+
+#### Kod Kalite (@review)
+```
+GONDER:
+- Degisen dosyalar (tam diff)
+- Ilgili ADR ve API kontrat
+- Ilgili US (kabul kriterleri)
+- Mevcut lessons-learned (tekrarlanan hatalar)
+- Tech-pack kurallari
+- Onceki review bulgulari (varsa)
+
+GONDERME:
+- Is analizi sureci
+- Kullanici iletisim gecmisi
+- Sprint planlama detaylari
+```
+
+#### Guvenlik Uzmani (@guvenlik)
+```
+GONDER:
+- Degisen dosyalar (ozellikle auth, input handling, API)
+- API kontrat (auth/authz gereksinimleri)
+- Veri modeli (PII alanlari)
+- Mevcut guvenlik yapilandirmasi
+- Bilinen tehdit modeli
+
+GONDERME:
+- UI/UX detaylari
+- Is analizi sureci
+- Sprint planlama
+```
+
+#### DevOps Muhendisi (@devops)
+```
+GONDER:
+- Degisen servisler / yeni servis bilgisi
+- Migration gereksinimleri
+- Environment yapilandirma ihtiyaclari
+- Mevcut pipeline yapisi
+- Deploy etkileri
+
+GONDERME:
+- Domain is mantigi
+- UI uygulama detaylari
+- Test senaryolari
+```
+
+---
+
+## KALITE KAPISI DETAYLI TANIMLARI
+
+### G1: Analiz Kapisi
+
+**Amac:** Gereksinim yeterli netlikte mi?
+
+| Kriter | Gecme Kosulu |
+|--------|-------------|
+| Kullanici istegi anlasildi | Is ozeti ve siniflandirma kullanici tarafindan onaylandi |
+| Domain terimleri netlestirildi | Belirsiz terim kalmadi |
+| Etki analizi yapildi | Etkilenen moduller/katmanlar belirlendi |
+
+**Kaldi Aksiyonu:** Kullaniciya belirsiz noktalari sor, yeniden analiz et.
+**Atlama Kosulu:** bugfix, refactor, performance, devops-infra is turleri.
+
+### G2: Kabul Kapisi
+
+**Amac:** User Story yazildi ve kabul kriterlerine sahip mi?
+
+| Kriter | Gecme Kosulu |
+|--------|-------------|
+| US dosyasi `requirements/` icinde | Dosya mevcut |
+| INVEST uyumlu | Bagimsiz, degerli, tahmin edilebilir, test edilebilir |
+| Kabul kriterleri (Gherkin) | En az 2 senaryo (basarili + hata) |
+| Kapsam ve risk | Siniflandirma tamamlandi |
+
+**Kaldi Aksiyonu:** Is Analisti'ne spesifik eksiklerle geri gonder.
+**Atlama Kosulu:** bugfix (S/M), refactor, performance, devops-infra.
+
+### G3: Mimari Kapisi
+
+**Amac:** Teknik tasarim kararlari alinip belgelendi mi?
+
+| Kriter | Gecme Kosulu |
+|--------|-------------|
+| ADR yazildi (`decisions/`) | Dosya mevcut, karar ve gerekce net |
+| API kontrat tanimlandi (`contracts/`) | Endpoint, request/response, hata kodlari |
+| Breaking change analizi | Non-breaking VEYA breaking + migration plani |
+| Katman/bounded context etki analizi | Etkilenen sinirlar belirlendi |
+
+**Kaldi Aksiyonu:** Mimari'ye eksik bolumleri belirterek geri gonder.
+**Atlama Kosulu:** bugfix, performance, ux-ui, devops-infra, research. Refactor icin OPSIYONEL.
+
+### G4: Uygulama Kapisi
+
+**Amac:** Kod uretildi ve temel kalite kriterlerini karsilıyor mu?
+
+| Kriter | Gecme Kosulu |
+|--------|-------------|
+| Build basarili | Derleme/build hatasi yok |
+| Lint hata yok | Linter/formatter temiz |
+| Katman ihlali yok | Domain dis katmana referans vermiyor |
+| Hardcoded secret yok | Credential, key, connection string yok |
+| Naming convention uygun | Tech-pack kurallarina gore |
+| API kontrat uyumu | Uygulama kontrat ile eslesiyor |
+
+**Kaldi Aksiyonu:** Ilgili developer'a spesifik hatalarla geri gonder.
+**Atlama Kosulu:** research.
+
+### G5: Test Kapisi
+
+**Amac:** Testler yazildi, geciyor ve yeterli kapsamda mi?
+
+| Kriter | Gecme Kosulu |
+|--------|-------------|
+| Unit testler | Kritik is mantigi ve hata yollari testte |
+| Integration testler | API endpoint'leri icin (uygulanabilir ise) |
+| Tum testler geciyor | Kirmizi test yok |
+| Coverage hedefi | Proje hedefini karsilamis (varsayilan: Domain+App %80) |
+
+**Kaldi Aksiyonu:** QA'ya eksik test senaryolarini belirterek geri gonder.
+**Atlama Kosulu:** devops-infra, research.
+
+### G6: Review Kapisi
+
+**Amac:** Kod incelendi ve kritik bulgu kalmadi mi?
+
+| Kriter | Gecme Kosulu |
+|--------|-------------|
+| 360 derece code review yapildi | code-quality agent calistirildi |
+| MUST-FIX bulgu yok | Tum MUST-FIX cozuldu |
+| Guvenlik review (gerekli ise) | Risk yuksek/kritik ise security agent calistirildi |
+| Breaking change kontrolu | Var ise dokumante edildi |
+
+**Kaldi Aksiyonu:** MUST-FIX bulgulari ilgili developer'a geri gonder.
+**Atlama Kosulu:** research.
+
+### G7: Yayin Kapisi
+
+**Amac:** Is tamamlandi, DoD karsilandi, kullanici onayi alindi mi?
+
+| Kriter | Gecme Kosulu |
+|--------|-------------|
+| DoD tum maddeleri karsilandi | Checklist tamamen isareti |
+| Workflow-state guncellendi | Son durum yansiyor |
+| Taskboard guncellendi | DONE kolonuna tasinmis |
+| Kullanici onayi | Demo veya gosterim yapildi, onay alindi |
+
+**Kaldi Aksiyonu:** Eksik DoD maddelerini belirterek ilgili agent'a geri gonder.
+**Atlama Kosulu:** research.
+
+---
+
+## BUYUK PROJE DAYANIKLILIK KURALLARI
+
+### Bounded Context Farkindaligi
+- Her is icin etkilenen bounded context'i belirle
+- Cross-context is varsa: context'ler arasi kontrat (API/event) tanimla
+- Ayni context icindeki isler paralel planlanabilir; cross-context isler sirayla
+
+### Uzun Zincir Korumasi
+- XL kapsam islerde her 3 adimda state snapshot al
+- Ara adim ciktilari `handoffs/` dosyasinda sakla
+- Agent zinciri kopma durumunda son snapshot'tan devam et
+
+### Teknik Borc Gorunurlugu
+- Her review'da tespit edilen tech debt `taskboard.md` RISK REGISTER'a eklenir
+- Sprint kapasitesinin %10'u tech debt icin ayrilir
+- 3+ sprint cozumsuz kalan tech debt → risk seviyesi yukseltilir
+
+### Coklu Modul Yonetimi
+- Birden fazla modulu etkileyen isler icin etki haritasi cikar
+- Her modul icin bagimlilik ve sirayi belirle
+- Moduller arasi kontrat degisikligi varsa → tum etkilenen modullerde test

@@ -4,6 +4,46 @@ All notable changes to the Cursor Agents Framework are documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2026-03-15
+
+### Added
+- **Enterprise-grade orchestration engine** in `orchestrator.mdc`:
+  - Work classification engine: 8 work types (feature, bugfix, refactor, integration, performance, ux-ui, devops-infra, research) with scope (S/M/L/XL) and risk level (low/medium/high/critical)
+  - Dynamic routing engine: per-work-type agent pipelines with minimum-necessary-agents principle
+  - Quality gate protocol: 7 mandatory gates (Analysis, Acceptance, Architecture, Implementation, Testing, Review, Release) with per-work-type applicability matrix
+  - Execution loop: classify → route → plan → [gate → agent → validate → state]* → summary
+  - State management protocol: shared state in `workflow-state.md`, only @sef writes
+  - Final summary protocol: structured completion report to user
+- **`orchestration-policies.mdc`** (new core file):
+  - Failure policy: 7 failure types, per-risk-level retry matrix, hard stop conditions, human-in-the-loop triggers
+  - Context filter specifications: per-agent-role "need to know" templates
+  - Quality gate detailed definitions: criteria, pass/fail actions, skip conditions for each gate
+- **New templates** (3):
+  - `_template-state-snapshot.md` — shared state checkpoint format
+  - `_template-failure-report.md` — standardized failure report
+  - `_template-quality-gate.md` — quality gate pass/fail report
+- **Manifest `orchestration` config block**: `singleEntryPoint`, `enableWorkClassification`, `enableDynamicRouting`, `enableQualityGates`, `enableFailurePolicy`, `enableContextFiltering`, `enableSharedState`, `maxRetries`, `humanInLoopThreshold`
+
+### Changed
+- `orchestrator.mdc`: Major rewrite — from static linear workflow to enterprise decision engine. Preserved: Kimlik, RACI, Sprint Planning, DoD, Anti-patterns
+- `global-conventions.mdc`: Agent communication protocol updated for orchestration flow; shared state read/write protocol added
+- `code-quality.mdc`: Quality gate integration section added; backend PR checklist strengthened (layer boundaries, retry/timeout, backward compat, logging); frontend PR checklist strengthened (loading/empty/error states, design consistency, component reuse, responsive, UX integrity, performance)
+- `workflow-state.md` template: Extended with shared state fields (work ID, type, agent pipeline, scope, affected layers, API/DB changes, test/review status, risk register, failure counter)
+- `_template-handoff.md`: Extended with structured context sections (work summary, agent-specific task, finalized decisions, technical context, constraints, expected output)
+- `agent-guide.md`: Rewritten for single entry point (@sef), orchestration flow, work types, quality gates, example workflows
+- Install scripts (`install.ps1`, `install.sh`): Updated to copy `orchestration-policies.mdc` as core rule
+- Manifest schema: `frameworkVersion` default updated to 4.0.0
+
+### Fixed
+- `agent-learning.mdc`: Replaced legacy `jeager-agents/v2` paths with `cursor-agents-framework`
+
+### Migration from v3.x
+- Backward compatible: existing v3.x projects continue to work
+- New orchestration features are enabled by default but all are optional via manifest `orchestration` block
+- Run `install.ps1` or `install.sh` to update rules; `project-config.mdc` preserved as always
+
+---
+
 ## [3.0.0] - 2026-03-01
 
 ### Added

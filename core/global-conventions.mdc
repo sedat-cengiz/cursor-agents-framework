@@ -129,37 +129,60 @@ priority: 10
 
 ## Agent Iletisim Protokolu
 
+> **Tek giris noktasi: @sef.** Tum gorevler orkestrator (@sef) uzerinden koordine edilir.
+> Agent'lar dogrudan kullanici tarafindan degil, orkestrator tarafindan cagrilir.
+> Orkestrasyon detaylari: `orchestrator.mdc`, `orchestration-policies.mdc`.
+
 ### Gorev Alirken
-1. `docs/agents/taskboard.md` oku — hangi gorev, hangi sprint
-2. `docs/agents/workflow-state.md` oku — akisin hangi adiminda
-3. Ilgili `requirements/`, `contracts/`, `decisions/`, `handoffs/` dosyalarini oku
-4. **Mevcut kodu oku** — tekrar yazma, uzerine ekle
+1. `docs/agents/workflow-state.md` oku — is turu, kapsam, risk, agent hatti, mevcut ilerleme
+2. `docs/agents/handoffs/` altindaki ilgili handoff dosyasini oku — filtrelenmis context
+3. `docs/agents/taskboard.md` oku — hangi gorev, hangi sprint
+4. Ilgili `requirements/`, `contracts/`, `decisions/` dosyalarini oku (handoff'ta referans verilenler)
 5. `docs/agents/lessons-learned.md` oku — ayni hatayi tekrarlama
+6. **Mevcut kodu oku** — tekrar yazma, uzerine ekle
 
 ### Is Bitirirken
 1. Linter hatalarini duzelt — sifir hata ile birak
 2. Testleri yaz veya guncelle — test olmadan is tamamlanmis sayilmaz
-3. `docs/agents/taskboard.md` guncelle (durum, tarih)
-4. Gerekiyorsa handoff notu birak
-5. Onemli karar gerekiyorsa **KULLANICIYA SOR** — tahmin etme
+3. Sonuclari orkestratora (@sef) raporla
+4. Onemli karar gerekiyorsa **KULLANICIYA SOR** — tahmin etme
+
+> **NOT:** Taskboard ve workflow-state guncellemesini agent degil, @sef yapar.
+> Agent sadece is ciktisini uretir ve sonucu raporlar.
 
 ### Handoff Notu Formati
 ```markdown
 # Handoff: [Kaynak Agent] -> [Hedef Agent]
 **Tarih:** YYYY-MM-DD
+**Is:** WORK-XXX | **Tur:** [is_turu] | **Kapsam:** [S/M/L/XL]
 
-## Tamamlanan Is
-- [Yapilan isler listesi]
+## Is Ozeti
+[1-2 cumle: ne yapilacak]
 
-## API / Kontrat Degisiklikleri
-- [Eklenen/degisen endpoint, DTO, event vb.]
+## Bu Agent'in Gorevi
+[Spesifik yapilacaklar]
 
-## Sonraki Adim
-- [Hedef agent'in yapacaklari]
+## Kesinlesmis Kararlar
+[ADR, kontrat referanslari, onceki agent ciktilari]
 
-## Dikkat Edilmesi Gerekenler
-- [Bilinen kisitlar, riskler, varsayimlar]
+## Teknik Baglam
+[Sadece bu agent'in ihtiyac duydugu bilgi]
+
+## Kisitlar ve Riskler
+[Bilinen sinirlamalar]
+
+## Beklenen Cikti
+[Ne uretmeli]
+
+## Definition of Done
+[Tamamlanma kriterleri]
 ```
+
+### Paylasimli State Protokolu
+- State dosyasi: `docs/agents/workflow-state.md`
+- **Sadece @sef** state yazar ve gunceller
+- Agent'lar state'i OKUR, dogrudan YAZMAZ
+- Agent sonucunu raporlar → @sef state'e yansitir
 
 ---
 

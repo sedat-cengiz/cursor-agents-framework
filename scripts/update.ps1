@@ -22,7 +22,7 @@ $ErrorActionPreference = "Stop"
 
 Write-Host ""
 Write-Host "╔══════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║  Cursor Agents Framework — Update v3.0   ║" -ForegroundColor Cyan
+Write-Host "║  Cursor Agents Framework — Update v4.0   ║" -ForegroundColor Cyan
 Write-Host "╚══════════════════════════════════════════╝" -ForegroundColor Cyan
 Write-Host ""
 

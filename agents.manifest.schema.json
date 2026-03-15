@@ -13,7 +13,7 @@
     "frameworkVersion": {
       "type": "string",
       "description": "Cursor Agents Framework version this manifest targets",
-      "default": "3.0.0"
+      "default": "4.0.0"
     },
     "projectName": {
       "type": "string",
@@ -174,6 +174,61 @@
           "type": "string",
           "enum": ["fibonacci", "linear", "tshirt"],
           "default": "fibonacci"
+        }
+      },
+      "additionalProperties": false
+    },
+    "orchestration": {
+      "type": "object",
+      "description": "Enterprise orchestration configuration (v4.0+). All fields optional with sensible defaults.",
+      "properties": {
+        "singleEntryPoint": {
+          "type": "boolean",
+          "description": "Enforce @sef as the sole entry point for all tasks",
+          "default": true
+        },
+        "enableWorkClassification": {
+          "type": "boolean",
+          "description": "Enable automatic work type classification (feature, bugfix, refactor, etc.)",
+          "default": true
+        },
+        "enableDynamicRouting": {
+          "type": "boolean",
+          "description": "Enable dynamic agent selection based on work type",
+          "default": true
+        },
+        "enableQualityGates": {
+          "type": "boolean",
+          "description": "Enable mandatory quality gate checkpoints between phases",
+          "default": true
+        },
+        "enableFailurePolicy": {
+          "type": "boolean",
+          "description": "Enable structured failure handling with retry limits and escalation",
+          "default": true
+        },
+        "enableContextFiltering": {
+          "type": "boolean",
+          "description": "Enable filtered context handoff (send only what each agent needs)",
+          "default": true
+        },
+        "enableSharedState": {
+          "type": "boolean",
+          "description": "Enable shared state tracking in workflow-state.md",
+          "default": true
+        },
+        "maxRetries": {
+          "type": "integer",
+          "description": "Maximum cumulative failures before hard stop",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 10
+        },
+        "humanInLoopThreshold": {
+          "type": "string",
+          "description": "Minimum risk level that triggers human-in-the-loop confirmation",
+          "enum": ["low", "medium", "high", "critical"],
+          "default": "high"
         }
       },
       "additionalProperties": false
