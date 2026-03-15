@@ -23,6 +23,11 @@ This framework turns Cursor into a **full software delivery system**: not just c
 - **Continuous Learning**: Agents record lessons; knowledge accumulates across projects
 - **Manifest-Based Configuration**: One `agents.manifest.json` defines your project setup
 - **Cross-Platform**: PowerShell, Bash, or manual setup
+- **Parallel Execution** (v4.1): Backend ∥ frontend and other ∥ steps run by procedure; join at completion, then single gate check
+- **Definition of Ready (DoR)** (v4.1): Entry criteria per gate and before handoff — Sef checks before each step
+- **DORA-Aligned Metrics** (v4.1, optional): Manifest `deliveryMetrics` for deployment frequency, lead time, MTTR, change failure rate — reporting and improvement
+- **Process–Orchestration Map** (v4.1): [ARCHITECTURE.md](docs/ARCHITECTURE.md) maps gates/agents to BPMN and process docs for compliance
+- **Observability & SRE** (v4.1, optional): [tech-devops](technology/tech-devops.mdc) — critical-flow logging, alert expectations, postmortem template
 
 ## How It Works
 
@@ -133,6 +138,14 @@ Not all agents run for every task. @sef selects the minimum necessary agents:
 
 Hard stop triggers: security risk, architecture violation (high risk), 3 cumulative failures, or user request.
 
+### Upper-Tier (v4.1)
+
+- **Parallel steps:** When the pipeline has ∥ (e.g. backend ∥ frontend), Sef prepares separate handoffs, runs both agents (same turn or sequentially), then validates and runs the gate once both are done. See `orchestrator.mdc` § 4.2a and `orchestration-policies.mdc` § Paralel adim.
+- **DoR:** Before each gate or handoff, Sef checks Definition of Ready (entry criteria) from `orchestration-policies.mdc` § Definition of Ready.
+- **Delivery metrics:** Optional `deliveryMetrics` in manifest + "Delivery Metrikleri" in global-conventions for DORA-style targets (not enforced by the framework).
+- **Process map:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) § "Surec ve Orkestrasyon Eslesmesi" — table mapping gates/agents to BPMN and process documentation.
+- **Observability:** Optional rules in tech-devops for critical-flow logging, health checks for new dependencies, postmortem template.
+
 ## Architecture
 
 ```
@@ -213,6 +226,12 @@ Set `"aliasLanguage": "en"` or `"both"` in your manifest.
     "enableFailurePolicy": true,
     "maxRetries": 3,
     "humanInLoopThreshold": "high"
+  },
+  "deliveryMetrics": {
+    "deploymentFrequency": "per-sprint",
+    "leadTimeTargetDays": 5,
+    "mttrTargetHours": 4,
+    "changeFailureRateTargetPercent": 15
   }
 }
 ```
