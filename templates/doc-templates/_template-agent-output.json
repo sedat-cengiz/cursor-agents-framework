@@ -1,0 +1,26 @@
+{
+  "agent": "@backend",
+  "job_id": "WORK-XXX",
+  "execution_id": "EXEC-XXXXXXXX",
+  "step_id": "implementation",
+  "gate_id": "G4",
+  "status": "success",
+  "status_reason": "Implementation completed without blockers.",
+  "failure_type": "none",
+  "summary": "Kisa ozet",
+  "produced_outputs": [
+    "src/example/file.ext"
+  ],
+  "changed_components": [
+    "OrderService"
+  ],
+  "changed_contracts": [],
+  "changed_data_model": "none",
+  "decision_refs": [
+    "DEC-WORK-XXX-001"
+  ],
+  "evidence_refs": [],
+  "next_action": "continue",
+  "retryable": "no",
+  "human_in_loop_required": "no"
+}

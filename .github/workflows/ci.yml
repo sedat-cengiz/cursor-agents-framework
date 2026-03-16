@@ -1,0 +1,121 @@
+# Cursor Agents Framework — CI
+# Schema validation, install/validate smoke tests, orchestration smoke tests, structure check
+
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  schema-validation:
+    name: Schema validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate example manifests against schema
+        run: |
+          for f in examples/*/agents.manifest.json; do
+            [ -f "$f" ] || continue
+            echo "Validating $f ..."
+            npx --yes ajv-cli@5 validate -s agents.manifest.schema.json -d "$f" --strict=false
+          done
+
+  install-validate-smoke:
+    name: Install + Validate smoke
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create temp project with example manifest
+        run: |
+          New-Item -ItemType Directory -Path smoke-project -Force
+          Copy-Item examples/fullstack-no-domain/agents.manifest.json smoke-project/
+
+      - name: Run install script
+        shell: pwsh
+        run: |
+          ./scripts/install.ps1 -ProjectPath $PWD/smoke-project -ManifestPath $PWD/smoke-project/agents.manifest.json
+
+      - name: Verify install output
+        shell: pwsh
+        run: |
+          if (-not (Test-Path smoke-project/.cursor/rules)) { throw ".cursor/rules not created" }
+          if (-not (Test-Path smoke-project/docs/agents)) { throw "docs/agents not created" }
+          $core = @("global-conventions.mdc", "orchestrator.mdc", "orchestration-policies.mdc", "code-quality.mdc")
+          foreach ($f in $core) {
+            if (-not (Test-Path "smoke-project/.cursor/rules/$f")) { throw "Core file $f missing" }
+          }
+
+      - name: Run validate script
+        shell: pwsh
+        run: |
+          ./scripts/validate.ps1 -TargetPath $PWD/smoke-project
+
+      - name: Run orchestration smoke tests
+        shell: pwsh
+        run: |
+          ./tests/run-smoke-tests.ps1 -RepoRoot $PWD -EnforcementScoreThreshold 0.90
+
+      - name: Run runtime unit tests (Pester)
+        shell: pwsh
+        run: |
+          Invoke-Pester ./tests/runtime/Runtime.Unit.Tests.ps1 -EnableExit
+
+      - name: Enforcement score gate
+        shell: pwsh
+        run: |
+          $scoreFile = "tests/smoke/enforcement-score.json"
+          if (-not (Test-Path $scoreFile)) { throw "Missing enforcement score report" }
+          $score = (Get-Content $scoreFile -Raw | ConvertFrom-Json).enforcement_score
+          if ($score -lt 0.90) { throw "Enforcement score gate failed: $score" }
+          Write-Host "Enforcement score gate passed: $score"
+
+  structure-check:
+    name: Markdown / structure check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Required paths and files
+        run: |
+          for path in \
+            core/orchestrator.mdc \
+            core/orchestration-policies.mdc \
+            core/code-quality.mdc \
+            core/global-conventions.mdc \
+            templates/doc-templates/workflow-state.md \
+            templates/doc-templates/_template-handoff.md \
+            templates/doc-templates/_template-quality-gate.md \
+            templates/doc-templates/_template-failure-report.md \
+            templates/doc-templates/_template-decision-log.md \
+            templates/doc-templates/_template-state-snapshot.md \
+            templates/doc-templates/_template-agent-output.json \
+            templates/agent-guide.md \
+            docs/ARCHITECTURE.md \
+            docs/ENFORCEMENT.md \
+            docs/example-workflows/feature-flow.md \
+            docs/example-workflows/bugfix-flow.md \
+            docs/example-workflows/refactor-flow.md \
+            README.md \
+            agents.manifest.schema.json \
+            scripts/install.ps1 \
+            scripts/install.sh \
+            scripts/validate.ps1 \
+            scripts/validate-orchestration.ps1 \
+            runtime/Invoke-Orchestration.ps1 \
+            runtime/Replay-Orchestration.ps1 \
+            runtime/engine/StateMachine.psm1 \
+            runtime/engine/EventStore.psm1 \
+            runtime/executor/EvidenceCollector.psm1 \
+            runtime/executor/AgentContract.psm1 \
+            runtime/executor/AgentExecutionAdapter.psm1 \
+            runtime/policies/RetryPolicy.psm1 \
+            tests/runtime/Runtime.Unit.Tests.ps1 \
+            tests/run-smoke-tests.ps1; do
+            test -e "$path" || { echo "Missing: $path"; exit 1; }
+          done
+          echo "All required paths present."

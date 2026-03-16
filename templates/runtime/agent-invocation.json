@@ -1,0 +1,28 @@
+{
+  "agents": {
+    "@analist": {
+      "command": "Write-Error 'Configure @analist command in docs/agents/runtime/agent-invocation.json'; exit 2"
+    },
+    "@mimari": {
+      "command": "Write-Error 'Configure @mimari command in docs/agents/runtime/agent-invocation.json'; exit 2"
+    },
+    "@backend": {
+      "command": "Write-Error 'Configure @backend command in docs/agents/runtime/agent-invocation.json'; exit 2"
+    },
+    "@frontend": {
+      "command": "Write-Error 'Configure @frontend command in docs/agents/runtime/agent-invocation.json'; exit 2"
+    },
+    "@qa": {
+      "command": "Write-Error 'Configure @qa command in docs/agents/runtime/agent-invocation.json'; exit 2"
+    },
+    "@review": {
+      "command": "Write-Error 'Configure @review command in docs/agents/runtime/agent-invocation.json'; exit 2"
+    },
+    "@guvenlik": {
+      "command": "Write-Error 'Configure @guvenlik command in docs/agents/runtime/agent-invocation.json'; exit 2"
+    },
+    "@devops": {
+      "command": "Write-Error 'Configure @devops command in docs/agents/runtime/agent-invocation.json'; exit 2"
+    }
+  }
+}

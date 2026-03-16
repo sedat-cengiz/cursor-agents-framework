@@ -12,6 +12,48 @@ priority: 16
 
 ---
 
+## MINIMAL ENFORCEMENT KATMANI
+
+Bu framework deterministik runtime + validator kombinasyonu ile calisir; kritik orkestrasyon davranislari makine tarafindan denetlenebilir olmalidir.
+Ana canli kapsam: `feature`, `bugfix`, `refactor`. Bu akislarda runtime event log, handoff, agent output contract ve gate evidence zinciri birlikte calisir.
+
+### Makine Tarafindan Dogrulanan Noktalar
+
+`scripts/validate-orchestration.ps1` asgari olarak sunlari kontrol eder:
+
+1. Workflow-state formatinin korunmasi
+2. Decision log alanlarinin tam olmasi
+3. Quality gate evidence alanlarinin bulunmasi
+4. Failure sayaçlarinin risk seviyesine uygunlugu
+5. State, decision log, quality gate ve failure report arasindaki referans zinciri
+6. Runtime event log referansi (`runtime/state-events.jsonl`)
+7. Strict modda handoff ve agent-output contract dosyalari
+
+`generic` evidence adapter build/test/security icin fail-closed davranir; gercek gate gecisi icin `dotnet`, `node`, `python` veya custom evidence command map kullanilmalidir.
+
+### Evidence Durum Enum'u
+
+Quality gate evidence alanlari yalnizca su degerleri kullanir:
+
+- `verified`
+- `not_verified`
+- `pending`
+- `skipped_with_reason`
+
+`skipped_with_reason`, sadece policy'de acikca atlanabilir tanimlanan durumlarda gecerlidir.
+
+### Traceability Minimumu
+
+Aktif orkestrasyonda su baglar kurulur:
+
+- workflow-state → decision log ref
+- workflow-state → quality gate ref
+- quality gate report → decision_id + state_ref
+- failure report → decision_id + failed_gate + state_ref
+- state snapshot → aktif gate/failure refs
+
+---
+
 ## HATA POLITIKASI
 
 ### Hata Taksonomisi
@@ -35,6 +77,29 @@ priority: 16
 | **yuksek** | 0 | Retry YOK → dogrudan ESKALASYON |
 | **kritik** | 0 | Retry YOK → DURDUR + kullaniciya rapor |
 
+### State-Bagli Failure Sayaclari
+
+Failure policy hafizaya degil, workflow-state alanlarina dayanir:
+
+| State Alani | Anlam |
+|-------------|-------|
+| `failure_count_total` | Is geneline yayilmis toplam basarisizlik |
+| `failure_count_current_stage` | Aktif faz icindeki basarisizlik sayisi |
+| `last_failure_type` | Son hata taksonomisi |
+| `last_failed_gate` | Son kalan gate |
+| `retry_allowed` | Risk ve mevcut sayaçlara gore yeni retry mumkun mu |
+| `escalation_required` | Kullaniciya donulmesi gerekiyor mu |
+| `human_in_loop_required` | Insan mudahalesi zorunlu mu |
+
+Kurallar:
+
+- `dusuk` risk → en fazla 2 retry
+- `orta` risk → en fazla 1 retry
+- `yuksek` risk → retry yok, escalation
+- `kritik` risk → retry yok, hard stop
+
+`@sef`, her basarisizliktan sonra once bu alanlari gunceller, sonra aksiyon secer.
+
 ### Hata Turune Gore Ozel Aksiyon
 
 | Hata Turu | Ilk Aksiyon | Retry Sonrasi |
@@ -53,13 +118,14 @@ Asagidaki durumlardan **herhangi biri** gerceklesirse yurutme DERHAL durur:
 
 1. `security_risk` tespit edildi
 2. `architecture_violation` ve risk seviyesi yuksek/kritik
-3. Kumulatif hata sayaci **3'e** ulasti (farkli adimlar dahil)
+3. `failure_count_total` **3'e** ulasti
 4. Ayni agent ayni hata turu ile **2 kez** basarisiz oldu
 5. Kullanici acikca "dur" veya "iptal" dedi
 
 Durdurma sonrasi:
-- Hata raporu olustur (`_template-failure-report.md` formatinda)
+- Hata raporu olustur (`_template-failure-report.md` formatinda); raporta "Ilgili Decision Log Girdisi" alanini doldur (varsa ilgili decision log dosyasi).
 - Mevcut state'i kaydet
+- `human_in_loop_required` ve `escalation_required` alanlarini state'te guncelle
 - Kullaniciya durum ozeti ver
 - Kullanici karari bekle (devam / iptal / yeniden planla)
 
@@ -217,6 +283,32 @@ GONDERME:
 
 ## KALITE KAPISI DETAYLI TANIMLARI
 
+### Gate Evidence Matrisi
+
+| Gate | Zorunlu Evidence | Gecer Kosulu | Atlanabilir Durum | Fail Sonrasi |
+|------|------------------|--------------|-------------------|--------------|
+| G1 Analiz | `documentation_status` | analiz kaydi ve kullanici onayi `verified` | bugfix, refactor, performance, devops-infra | eksik bilgi icin kullaniciya don |
+| G2 Kabul | `documentation_status` | US/kabul kriteri ve kapsam-risk kaydi `verified` | bugfix (S/M), refactor, performance, devops-infra | analiste eksiklerle geri don |
+| G3 Mimari | `documentation_status`, `review_status` | ADR/kontrat/breaking change analizi `verified` | bugfix, performance, ux-ui, devops-infra, research; refactor'da tetikleyici yoksa | mimariye geri don veya human-in-loop |
+| G4 Uygulama | `build_status`, `lint_status`, `security_status`, `documentation_status` | zorunlu evidence `verified`, kontrat uyumu dogrulanmis | research | ilgili teknik agent'a geri don; failure sayaçlarini arttir |
+| G5 Test | `test_status`, `coverage_status`, `documentation_status` | test ve coverage kurallari `verified` | devops-infra, research | QA/developer'a geri don |
+| G6 Review | `review_status`, `security_status`, `documentation_status` | MUST-FIX yok ve gerekli review'ler `verified` | research | review/developer/security akislarina geri don |
+| G7 Yayin | `documentation_status`, `review_status` | DoD, state, taskboard ve kullanici onayi `verified` | research | eksik kapanis adimlarini tamamla |
+
+### Evidence Alanlari ve Anlamlari
+
+| Alan | Kullanimi |
+|------|-----------|
+| `build_status` | Derleme / build / compile sonucu |
+| `lint_status` | Linter / formatter / static quality sonucu |
+| `test_status` | Unit/integration/e2e test sonucu |
+| `coverage_status` | Coverage hedefinin dogrulanmasi |
+| `review_status` | Code review / security review sonucu |
+| `security_status` | Secret, auth, input, dependency veya guvenlik inceleme sonucu |
+| `documentation_status` | State, handoff, contract, ADR, taskboard, final rapor dokumantasyon durumu |
+
+Gate raporunda zorunlu olmayan evidence alanlari bos birakilmaz; `pending` veya `skipped_with_reason` ile acikca isaretlenir.
+
 ### G1: Analiz Kapisi
 
 **Amac:** Gereksinim yeterli netlikte mi?
@@ -229,6 +321,7 @@ GONDERME:
 
 **Kaldi Aksiyonu:** Kullaniciya belirsiz noktalari sor, yeniden analiz et.
 **Atlama Kosulu:** bugfix, refactor, performance, devops-infra is turleri.
+**Evidence:** `documentation_status=verified`; diger evidence alanlari `skipped_with_reason` olabilir.
 
 ### G2: Kabul Kapisi
 
@@ -243,6 +336,7 @@ GONDERME:
 
 **Kaldi Aksiyonu:** Is Analisti'ne spesifik eksiklerle geri gonder.
 **Atlama Kosulu:** bugfix (S/M), refactor, performance, devops-infra.
+**Evidence:** `documentation_status=verified`; test/build benzeri alanlar `skipped_with_reason`.
 
 ### G3: Mimari Kapisi
 
@@ -257,6 +351,7 @@ GONDERME:
 
 **Kaldi Aksiyonu:** Mimari'ye eksik bolumleri belirterek geri gonder.
 **Atlama Kosulu:** bugfix, performance, ux-ui, devops-infra, research. Refactor icin OPSIYONEL.
+**Evidence:** `documentation_status=verified`, `review_status=verified` veya `skipped_with_reason` (review gerekmiyorsa).
 
 ### G4: Uygulama Kapisi
 
@@ -273,6 +368,7 @@ GONDERME:
 
 **Kaldi Aksiyonu:** Ilgili developer'a spesifik hatalarla geri gonder.
 **Atlama Kosulu:** research.
+**Evidence:** `build_status=verified`, `lint_status=verified`, `security_status=verified` veya risk nedeniyle `skipped_with_reason` degilse `verified`, `documentation_status=verified`.
 
 ### G5: Test Kapisi
 
@@ -287,6 +383,7 @@ GONDERME:
 
 **Kaldi Aksiyonu:** QA'ya eksik test senaryolarini belirterek geri gonder.
 **Atlama Kosulu:** devops-infra, research.
+**Evidence:** `test_status=verified`, `coverage_status=verified`, `documentation_status=verified`.
 
 ### G6: Review Kapisi
 
@@ -301,6 +398,7 @@ GONDERME:
 
 **Kaldi Aksiyonu:** MUST-FIX bulgulari ilgili developer'a geri gonder.
 **Atlama Kosulu:** research.
+**Evidence:** `review_status=verified`, `security_status=verified` veya `skipped_with_reason` (dusuk risk), `documentation_status=verified`.
 
 ### G7: Yayin Kapisi
 
@@ -315,6 +413,7 @@ GONDERME:
 
 **Kaldi Aksiyonu:** Eksik DoD maddelerini belirterek ilgili agent'a geri gonder.
 **Atlama Kosulu:** research.
+**Evidence:** `documentation_status=verified`, `review_status=verified`; diger alanlar onceki gate refs ile desteklenir.
 
 ---
 
@@ -388,6 +487,17 @@ Her kalite kapisi veya agent adimina girmeden once asagidaki "hazir mi?" kriterl
 - [ ] Kullanici onayi icin hazir (demo/gosterim plani)
 
 **Kullanim:** Sef her adimda once ilgili DoR maddelerini kontrol eder; eksik varsa once eksigi giderir (kullaniciya sor, eksik handoff tamamla), sonra agent cagirir veya kapiyi degerlendirir.
+
+### Traceability (Decision Log Referansi)
+
+Kalite kapisi raporu (`_template-quality-gate.md`) doldurulurken "Gerekce / Decision Ref" alanini doldur; kapi gecti/kaldi gerekcesi ve ilgili decision log kaydina referans ver. Workflow-state ve state snapshot'ta kapi satirlarinda "Gerekce / Decision Ref" kullanilir. Hata raporunda "Ilgili Decision Log Girdisi" alani doldurulur; boylece review/release asamasinda hangi kapinin neden gectigi/kaldigi ve hata-eskalasyon kararlari izlenebilir.
+
+Zorunlu bag kurallari:
+
+1. Gate `KALDI` ise gate raporu icinde ilgili `decision_id` bulunur.
+2. Retry veya escalation karari varsa failure report icinde ilgili `decision_id` ve `last_failed_gate` bulunur.
+3. Workflow-state icindeki `major_decisions` listesi kritik `decision_id` degerlerini tutar.
+4. Final ozet, kritik karar ve failure ref'lerini toplu halde kullaniciya sunar.
 
 ---
 

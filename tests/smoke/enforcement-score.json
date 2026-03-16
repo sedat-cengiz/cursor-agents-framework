@@ -1,0 +1,7 @@
+{
+    "total_checks":  8,
+    "successful_checks":  8,
+    "threshold":  0.9,
+    "enforcement_score":  1,
+    "live_runtime_checks":  8
+}

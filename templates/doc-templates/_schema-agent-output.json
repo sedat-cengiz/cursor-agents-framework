@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cursor-agents-framework/templates/doc-templates/_schema-agent-output.json",
+  "title": "Cursor Agents Framework Agent Output",
+  "type": "object",
+  "required": [
+    "agent",
+    "job_id",
+    "execution_id",
+    "step_id",
+    "gate_id",
+    "status",
+    "status_reason",
+    "failure_type",
+    "summary",
+    "produced_outputs",
+    "changed_components",
+    "changed_contracts",
+    "changed_data_model",
+    "decision_refs",
+    "evidence_refs",
+    "next_action",
+    "retryable",
+    "human_in_loop_required"
+  ],
+  "properties": {
+    "agent": { "type": "string" },
+    "job_id": { "type": "string" },
+    "execution_id": { "type": "string" },
+    "step_id": { "type": "string" },
+    "gate_id": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": ["success", "failed", "blocked"]
+    },
+    "status_reason": { "type": "string" },
+    "failure_type": {
+      "type": "string",
+      "enum": [
+        "none",
+        "format_error",
+        "missing_output",
+        "logic_inconsistency",
+        "architecture_violation",
+        "test_failure",
+        "security_risk",
+        "insufficient_context",
+        "timeout",
+        "policy_violation"
+      ]
+    },
+    "summary": { "type": "string" },
+    "produced_outputs": { "type": "array", "items": { "type": "string" } },
+    "changed_components": { "type": "array", "items": { "type": "string" } },
+    "changed_contracts": { "type": "array", "items": { "type": "string" } },
+    "changed_data_model": { "type": "string" },
+    "decision_refs": { "type": "array", "items": { "type": "string" } },
+    "evidence_refs": { "type": "array", "items": { "type": "string" } },
+    "next_action": { "type": "string" },
+    "retryable": { "type": "string", "enum": ["yes", "no"] },
+    "human_in_loop_required": { "type": "string", "enum": ["yes", "no"] }
+  },
+  "additionalProperties": true
+}

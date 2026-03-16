@@ -1,0 +1,9 @@
+{
+  "agent": "@frontend",
+  "job_id": "WORK-FEATURE-001",
+  "status": "success",
+  "produced_outputs": [
+    "src/frontend/order-page.tsx"
+  ],
+  "summary": "Frontend implementation completed."
+}

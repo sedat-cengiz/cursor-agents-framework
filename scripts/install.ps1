@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Cursor Agents Framework — Project Installer (Cross-Platform PowerShell)
+    Cursor Agents Framework - Project Installer (Cross-Platform PowerShell)
 .DESCRIPTION
     Installs agent rules into a project's .cursor/rules/ directory.
     Supports interactive mode (prompts for tech/domain selection) or
@@ -23,17 +23,34 @@ $ErrorActionPreference = "Stop"
 $FrameworkPath = Split-Path -Parent $PSScriptRoot
 
 Write-Host ""
-Write-Host "  ╔══════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "  ║  Cursor Agents Framework — Project Setup     ║" -ForegroundColor Cyan
-Write-Host "  ║  Modular Multi-Agent System v4.0             ║" -ForegroundColor Cyan
-Write-Host "  ╚══════════════════════════════════════════════╝" -ForegroundColor Cyan
+Write-Host "  ==============================================" -ForegroundColor Cyan
+Write-Host "    Cursor Agents Framework - Project Setup" -ForegroundColor Cyan
+Write-Host "    Modular Multi-Agent System v4.0" -ForegroundColor Cyan
+Write-Host "  ==============================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  Framework: $FrameworkPath"
 Write-Host "  Project:   $ProjectPath"
 Write-Host ""
 
-$TargetRules = Join-Path $ProjectPath ".cursor" "rules"
-$TargetDocs  = Join-Path $ProjectPath "docs" "agents"
+$TargetRules = Join-Path (Join-Path $ProjectPath ".cursor") "rules"
+$TargetDocs  = Join-Path (Join-Path $ProjectPath "docs") "agents"
+$TargetRuntime = Join-Path $ProjectPath "runtime"
+$TargetScripts = Join-Path $ProjectPath "scripts"
+
+function Copy-FileIfPresent {
+    param(
+        [string]$Source,
+        [string]$Destination
+    )
+
+    if (Test-Path $Source) {
+        $destinationDir = Split-Path $Destination -Parent
+        if ($destinationDir -and -not (Test-Path $destinationDir)) {
+            New-Item -ItemType Directory -Path $destinationDir -Force | Out-Null
+        }
+        Copy-Item $Source $Destination -Force
+    }
+}
 
 if (-not (Test-Path (Join-Path $FrameworkPath "core"))) {
     Write-Host "  ERROR: Framework core not found at $FrameworkPath" -ForegroundColor Red
@@ -41,6 +58,8 @@ if (-not (Test-Path (Join-Path $FrameworkPath "core"))) {
 }
 
 New-Item -ItemType Directory -Path $TargetRules -Force | Out-Null
+New-Item -ItemType Directory -Path $TargetRuntime -Force | Out-Null
+New-Item -ItemType Directory -Path $TargetScripts -Force | Out-Null
 
 # --- Manifest-driven or interactive ---
 $manifest = $null
@@ -53,16 +72,16 @@ if ($ManifestPath -and (Test-Path $ManifestPath)) {
     Write-Host "  Using manifest: $ManifestPath" -ForegroundColor Green
 }
 
-# ═══════════════════════════════════════
+# =======================================
 # STEP 1: Core (always)
-# ═══════════════════════════════════════
+# =======================================
 Write-Host "  [1/6] Core rules..." -ForegroundColor Yellow
-Copy-Item (Join-Path $FrameworkPath "core" "*.mdc") $TargetRules -Force
+Copy-Item (Join-Path (Join-Path $FrameworkPath "core") "*.mdc") $TargetRules -Force
 Write-Host "        > global-conventions, orchestrator, orchestration-policies, code-quality" -ForegroundColor Green
 
-# ═══════════════════════════════════════
+# =======================================
 # STEP 2: Technology
-# ═══════════════════════════════════════
+# =======================================
 $techPacks = @{
     "1"  = "tech-dotnet";    "dotnet"     = "tech-dotnet"
     "2"  = "tech-react";     "react"      = "tech-react"
@@ -88,7 +107,7 @@ if ($manifest) {
     $selectedTech = $manifest.layers.technology
     foreach ($t in $selectedTech) {
         $file = "tech-$t.mdc"
-        $src = Join-Path $FrameworkPath "technology" $file
+        $src = Join-Path (Join-Path $FrameworkPath "technology") $file
         if (Test-Path $src) {
             Copy-Item $src $TargetRules -Force
             Write-Host "        > $file" -ForegroundColor Green
@@ -106,14 +125,14 @@ if ($manifest) {
     $choice = Read-Host "  Select (e.g. 1,2,14,15 or A)"
 
     if ($choice -eq "A" -or $choice -eq "a") {
-        Copy-Item (Join-Path $FrameworkPath "technology" "tech-*.mdc") $TargetRules -Force
+        Copy-Item (Join-Path (Join-Path $FrameworkPath "technology") "tech-*.mdc") $TargetRules -Force
         Write-Host "        > All technology packs installed" -ForegroundColor Green
     } else {
         $selections = $choice -split "[,\s]+" | Where-Object { $_ -ne "" }
         foreach ($c in $selections) {
             $pack = $techPacks[$c.Trim()]
             if ($pack) {
-                $src = Join-Path $FrameworkPath "technology" "$pack.mdc"
+                $src = Join-Path (Join-Path $FrameworkPath "technology") "$pack.mdc"
                 if (Test-Path $src) {
                     Copy-Item $src $TargetRules -Force
                     Write-Host "        > $pack.mdc" -ForegroundColor Green
@@ -123,31 +142,35 @@ if ($manifest) {
     }
 }
 
-# ═══════════════════════════════════════
+# =======================================
 # STEP 3: Process (always)
-# ═══════════════════════════════════════
+# =======================================
 Write-Host ""
 Write-Host "  [3/6] Process rules..." -ForegroundColor Yellow
-Copy-Item (Join-Path $FrameworkPath "process" "*.mdc") $TargetRules -Force
+Copy-Item (Join-Path (Join-Path $FrameworkPath "process") "*.mdc") $TargetRules -Force
 Write-Host "        > process-analysis, process-architecture, process-documentation" -ForegroundColor Green
 
-# ═══════════════════════════════════════
+# =======================================
 # STEP 4: Domain
-# ═══════════════════════════════════════
+# =======================================
 Write-Host ""
 Write-Host "  [4/6] Domain packs..." -ForegroundColor Yellow
 
 $domainDirs = Get-ChildItem (Join-Path $FrameworkPath "domains") -Directory | Where-Object { $_.Name -ne "_template" }
 
-if ($manifest -and $manifest.layers.domain) {
-    foreach ($d in $manifest.layers.domain) {
-        $domainPath = Join-Path $FrameworkPath "domains" $d
-        if (Test-Path $domainPath) {
-            Copy-Item (Join-Path $domainPath "*.mdc") $TargetRules -Force
-            Write-Host "        > $d domain pack" -ForegroundColor Green
-        } else {
-            Write-Host "        > $d (NOT FOUND)" -ForegroundColor Red
+if ($manifest) {
+    if ($manifest.layers.domain -and $manifest.layers.domain.Count -gt 0) {
+        foreach ($d in $manifest.layers.domain) {
+            $domainPath = Join-Path (Join-Path $FrameworkPath "domains") $d
+            if (Test-Path $domainPath) {
+                Copy-Item (Join-Path $domainPath "*.mdc") $TargetRules -Force
+                Write-Host "        > $d domain pack" -ForegroundColor Green
+            } else {
+                Write-Host "        > $d (NOT FOUND)" -ForegroundColor Red
+            }
         }
+    } else {
+        Write-Host "        > No domain selected" -ForegroundColor DarkGray
     }
 } else {
     $i = 1
@@ -164,7 +187,7 @@ if ($manifest -and $manifest.layers.domain) {
         foreach ($c in $dChoice.ToCharArray()) {
             $dName = $domainMap["$c"]
             if ($dName) {
-                $domainPath = Join-Path $FrameworkPath "domains" $dName
+                $domainPath = Join-Path (Join-Path $FrameworkPath "domains") $dName
                 Copy-Item (Join-Path $domainPath "*.mdc") $TargetRules -Force
                 Write-Host "        > $dName domain pack" -ForegroundColor Green
             }
@@ -174,22 +197,31 @@ if ($manifest -and $manifest.layers.domain) {
     }
 }
 
-# ═══════════════════════════════════════
-# STEP 5: Learning + Docs structure
-# ═══════════════════════════════════════
+# =======================================
+# STEP 5: Learning + runtime + docs structure
+# =======================================
 Write-Host ""
-Write-Host "  [5/6] Learning system + docs structure..." -ForegroundColor Yellow
+Write-Host "  [5/6] Learning system + runtime + docs structure..." -ForegroundColor Yellow
 
-Copy-Item (Join-Path $FrameworkPath "learning" "agent-learning.mdc") $TargetRules -Force
+Copy-Item (Join-Path (Join-Path $FrameworkPath "learning") "agent-learning.mdc") $TargetRules -Force
 
-$docDirs = @("", "requirements", "decisions", "contracts", "handoffs", "reviews")
+$docDirs = @("", "requirements", "decisions", "contracts", "handoffs", "reviews", "quality-gates", "failures", "state-snapshots", "runtime", "agent-outputs")
 foreach ($sub in $docDirs) {
     $dir = Join-Path $TargetDocs $sub
     New-Item -ItemType Directory -Path $dir -Force | Out-Null
 }
 
+Copy-Item (Join-Path (Join-Path $FrameworkPath "runtime") "*") $TargetRuntime -Recurse -Force
+Copy-FileIfPresent -Source (Join-Path (Join-Path $FrameworkPath "scripts") "validate.ps1") -Destination (Join-Path $TargetScripts "validate.ps1")
+Copy-FileIfPresent -Source (Join-Path (Join-Path $FrameworkPath "scripts") "validate-orchestration.ps1") -Destination (Join-Path $TargetScripts "validate-orchestration.ps1")
+Copy-FileIfPresent -Source (Join-Path (Join-Path $FrameworkPath "scripts") "run-agent.ps1") -Destination (Join-Path $TargetScripts "run-agent.ps1")
+Copy-FileIfPresent -Source (Join-Path $FrameworkPath "agents.manifest.schema.json") -Destination (Join-Path $ProjectPath "agents.manifest.schema.json")
+Copy-FileIfPresent -Source (Join-Path (Join-Path $FrameworkPath "templates\runtime") "agent-invocation.json") -Destination (Join-Path (Join-Path $TargetDocs "runtime") "agent-invocation.json")
+Copy-FileIfPresent -Source (Join-Path (Join-Path $FrameworkPath "templates\runtime") "evidence-command-map.json") -Destination (Join-Path (Join-Path $TargetDocs "runtime") "evidence-command-map.json")
+Copy-FileIfPresent -Source (Join-Path (Join-Path $FrameworkPath "templates\doc-templates") "_schema-agent-output.json") -Destination (Join-Path (Join-Path $TargetDocs "agent-outputs") "_schema-agent-output.json")
+
 if (Test-Path (Join-Path $FrameworkPath "standards")) {
-    Copy-Item (Join-Path $FrameworkPath "standards" "*.md") $TargetDocs -Force
+    Copy-Item (Join-Path (Join-Path $FrameworkPath "standards") "*.md") $TargetDocs -Force
 }
 
 $templateDir = Join-Path $FrameworkPath "templates"
@@ -201,7 +233,7 @@ if (-not (Test-Path $lessonsFile)) {
 
 $taskboardFile = Join-Path $TargetDocs "taskboard.md"
 if (-not (Test-Path $taskboardFile)) {
-    Copy-Item (Join-Path $templateDir "doc-templates" "taskboard.md") $taskboardFile -ErrorAction SilentlyContinue
+    Copy-Item (Join-Path (Join-Path $templateDir "doc-templates") "taskboard.md") $taskboardFile -ErrorAction SilentlyContinue
     if (-not (Test-Path $taskboardFile)) {
         "# Gorev Tablosu`nSon Guncelleme: $(Get-Date -Format 'yyyy-MM-dd')`n`n### BACKLOG`n`n### IN PROGRESS`n`n### DONE`n" | Set-Content $taskboardFile
     }
@@ -209,14 +241,64 @@ if (-not (Test-Path $taskboardFile)) {
 
 $wfFile = Join-Path $TargetDocs "workflow-state.md"
 if (-not (Test-Path $wfFile)) {
-    "# Workflow State`nAktif Faz: Analiz`nSon Guncelleme: $(Get-Date -Format 'yyyy-MM-dd')`n" | Set-Content $wfFile
+    Copy-Item (Join-Path (Join-Path $templateDir "doc-templates") "workflow-state.md") $wfFile -ErrorAction SilentlyContinue
+    if (-not (Test-Path $wfFile)) {
+        "# Workflow State`n" | Set-Content $wfFile
+    }
 }
 
-Write-Host "        > Learning + docs/agents/ structure created" -ForegroundColor Green
+$runtimeEventLog = Join-Path (Join-Path $TargetDocs "runtime") "state-events.jsonl"
+if (-not (Test-Path $runtimeEventLog)) {
+    New-Item -ItemType File -Path $runtimeEventLog -Force | Out-Null
+}
 
-# ═══════════════════════════════════════
+$agentGuideFile = Join-Path $TargetDocs "agent-guide.md"
+if (-not (Test-Path $agentGuideFile)) {
+    $agentGuideTemplatePath = Join-Path $templateDir "agent-guide.md"
+    if (Test-Path $agentGuideTemplatePath) {
+        $projectName = if ($manifest -and $manifest.projectName) { $manifest.projectName } else { Split-Path $ProjectPath -Leaf }
+        $backendTech = if ($manifest -and $manifest.technologyStack -and $manifest.technologyStack.backend) { $manifest.technologyStack.backend } else { "backend-tech" }
+        $frontendTech = if ($manifest -and $manifest.technologyStack -and $manifest.technologyStack.frontend) { $manifest.technologyStack.frontend } else { "frontend-tech" }
+        $databaseTech = if ($manifest -and $manifest.technologyStack -and $manifest.technologyStack.database) { $manifest.technologyStack.database } else { "database-tech" }
+        $agentGuideContent = Get-Content $agentGuideTemplatePath -Raw
+        $agentGuideContent = $agentGuideContent.Replace("{{PROJE_ADI}}", $projectName)
+        $agentGuideContent = $agentGuideContent.Replace("{{BACKEND}}", $backendTech)
+        $agentGuideContent = $agentGuideContent.Replace("{{FRONTEND}}", $frontendTech)
+        $agentGuideContent = $agentGuideContent.Replace("{{DATABASE}}", $databaseTech)
+        Set-Content -Path $agentGuideFile -Value $agentGuideContent
+    }
+}
+
+$projectConfigFile = Join-Path $TargetRules "project-config.mdc"
+if (-not (Test-Path $projectConfigFile)) {
+    $projectConfigTemplate = Join-Path $templateDir "project-config-template.mdc"
+    if (Test-Path $projectConfigTemplate) {
+        $projectName = if ($manifest -and $manifest.projectName) { $manifest.projectName } else { Split-Path $ProjectPath -Leaf }
+        $projectConfigContent = Get-Content $projectConfigTemplate -Raw
+        $projectConfigContent = $projectConfigContent.Replace("{{PROJE_ADI}}", $projectName)
+        $projectConfigContent = $projectConfigContent.Replace("{{PLATFORM_TANIMI}}", "Fill this project-specific platform description.")
+        $projectConfigContent = $projectConfigContent.Replace("{{DEV_TENANT_GUID}}", "FILL-ME")
+        $projectConfigContent = $projectConfigContent.Replace("{{BACKEND_PORT}}", "5000")
+        $projectConfigContent = $projectConfigContent.Replace("{{FRONTEND_PORT}}", "3000")
+        Set-Content -Path $projectConfigFile -Value $projectConfigContent
+    }
+}
+
+$agentsEntryPoint = Join-Path $ProjectPath "AGENTS.md"
+if (-not (Test-Path $agentsEntryPoint)) {
+    @(
+        "# AGENTS"
+        ""
+        "Bu projede kullanici tek giris noktasi olarak `@sef` ile calisir."
+        "Detayli orkestrasyon rehberi: `docs/agents/agent-guide.md`."
+    ) | Set-Content -Path $agentsEntryPoint
+}
+
+Write-Host "        > Learning + docs/agents/ + project-local runtime created" -ForegroundColor Green
+
+# =======================================
 # STEP 6: Aliases
-# ═══════════════════════════════════════
+# =======================================
 Write-Host ""
 Write-Host "  [6/6] Creating aliases..." -ForegroundColor Yellow
 
@@ -283,11 +365,11 @@ foreach ($alias in $defaultAliases.GetEnumerator()) {
 
 Write-Host "        > Aliases: $($aliasCreated -join ', ')" -ForegroundColor Green
 
-# ═══════════════════════════════════════
+# =======================================
 # DONE
-# ═══════════════════════════════════════
+# =======================================
 Write-Host ""
-Write-Host "  ════════════════════════════════════════════════" -ForegroundColor Cyan
+Write-Host "  ================================================" -ForegroundColor Cyan
 Write-Host "   Cursor Agents Framework installed!" -ForegroundColor Green
 Write-Host ""
 Write-Host "   Next steps:"
@@ -296,5 +378,5 @@ Write-Host "   2. Edit .cursor/rules/global-conventions.mdc"
 Write-Host "      - Fill project name and platform"
 Write-Host "      - Adjust technology stack if needed"
 Write-Host "   3. Start with @sef for task coordination"
-Write-Host "  ════════════════════════════════════════════════" -ForegroundColor Cyan
+Write-Host "  ================================================" -ForegroundColor Cyan
 Write-Host ""

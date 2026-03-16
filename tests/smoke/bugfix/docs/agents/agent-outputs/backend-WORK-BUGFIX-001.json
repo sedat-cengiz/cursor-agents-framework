@@ -1,0 +1,9 @@
+{
+  "agent": "@backend",
+  "job_id": "WORK-BUGFIX-001",
+  "status": "success",
+  "produced_outputs": [
+    "src/backend/auth-service.ts"
+  ],
+  "summary": "Bugfix patch applied."
+}

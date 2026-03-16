@@ -1,7 +1,7 @@
 # Agent Rehberi — {{PROJE_ADI}}
 
 > Bu proje **Cursor Agents Framework v4.0** kullanir.
-> **Tek giris noktasi: `@sef`** — Tum orkestrasyon otomatik isletilir.
+> **Tek giris noktasi: `@sef`** — Kullanici sadece `@sef` ile calisir; diger agent'lar ic koordinasyon katmanidir.
 
 ## Nasil Calisir?
 
@@ -14,7 +14,8 @@ Kullanici → @sef "su ozelligi ekle"
   → Sef: Kullaniciya final ozet verir
 ```
 
-Kullanici diger agent'lari dogrudan cagirmaz. @sef gerekli agent'lari otomatik secer ve yonlendirir.
+Kullanici diger agent'lari dogrudan cagirmaz. `@sef` gerekli agent'lari otomatik secer, yonlendirir, state'i gunceller ve gerekiyorsa gate / failure / decision kayitlari uretir.
+Runtime artik serbest metin kullanici isteginden `job_type`, `scope`, `risk_level`, etkilenen katmanlar ve onay checkpoint'leri cikarir; sonra baglama gore minimal agent set secer.
 
 ## Rol / Kural Eslemesi
 
@@ -55,8 +56,29 @@ Her is, turune gore belirlenen kalite kapilarindan gecer:
 G1 Analiz → G2 Kabul → G3 Mimari → G4 Uygulama → G5 Test → G6 Review → G7 Yayin
 ```
 
-Kapilar is turune gore atlanabilir (ornegin bugfix icin G1/G2/G3 atlanir).
-Detay: `orchestrator.mdc` ve `orchestration-policies.mdc`.
+Kapilar is turune gore atlanabilir (ornegin bugfix icin G1/G2/G3 atlanir). Ancak gate karari yalnizca anlatimla verilmez; evidence alanlari ve decision ref'leri ile kaydedilir.
+Detay: `orchestrator.mdc` ve `orchestration-policies.mdc`. Tam ornek akislar (feature, bugfix, refactor): framework `docs/example-workflows/`.
+
+### Enforcement Katmani
+
+Bu proje artik deterministik bir runtime kullanir. `feature`, `bugfix` ve `refactor` akislari icin `@sef` su omurga uzerinden ilerler:
+
+- serbest metin istegi intake katmaninda normalize eder
+- plan ve release onaylarini ayri checkpoint olarak yazar
+- filtrelenmis handoff yazar
+- project-local `scripts/run-agent.ps1` uzerinden ilgili agent'i cagirir
+- normalize edilmis agent output kontratini dogrular
+- gate evidence komutlarini calistirir
+- runtime event log, workflow-state, decision log, gate report ve failure report arasinda bag kurar
+- ayni `execution_id` ile resume eder; tamamlanmis adimlari tekrar kosmaz
+
+Desteklenen dar ama gercek yol:
+- `feature`
+- `bugfix`
+- `refactor`
+
+Not: `generic` evidence adapter artik build/test/security icin fail-closed davranir. Gercek gate gecisi icin `dotnet`, `node`, `python` veya ozel command map kullanin.
+Not: Gercek agent kosumu icin proje icinde `docs/agents/runtime/agent-invocation.json` doldurulmalidir.
 
 ### Ornek Akis: Yeni Ozellik (feature)
 
@@ -92,10 +114,18 @@ Detay: `orchestrator.mdc` ve `orchestration-policies.mdc`.
 | Workflow State | `docs/agents/workflow-state.md` | Paylasimli state — is durumu, agent hatti, degisiklikler |
 | Taskboard | `docs/agents/taskboard.md` | Gorev tablosu (BACKLOG → DONE) |
 | Requirements | `docs/agents/requirements/` | User story'ler (US-*.md) |
-| Decisions | `docs/agents/decisions/` | ADR'ler (ADR-*.md) |
+| Decisions | `docs/agents/decisions/` | ADR'ler (ADR-*.md) + Decision log (orkestrasyon kararlari) |
 | Contracts | `docs/agents/contracts/` | API kontratlari |
 | Handoffs | `docs/agents/handoffs/` | Agent arasi filtrelenmis teslim notlari |
+| Quality Gates | `docs/agents/quality-gates/` | Gate evidence ve gate kararlari |
+| Failures | `docs/agents/failures/` | Retry / escalation / hard stop kayitlari |
+| State Snapshots | `docs/agents/state-snapshots/` | Checkpoint veya failure sonrasi dondurulmus state |
+| Runtime Config | `docs/agents/runtime/` | Event log, evidence command map, agent invocation config |
 | Lessons Learned | `docs/agents/lessons-learned.md` | Ogrenilen dersler |
+
+### Decision Log (Orkestrasyon Kararlari)
+
+@sef onemli operasyonel kararlari (siniflandirma, agent secimi, kapi gecisi/atlama, retry, eskalasyon, hard stop) `docs/agents/decisions/` altinda decision log formatinda kaydeder. Sablon: `templates/doc-templates/_template-decision-log.md` (framework repo'da). Mimari kararlar icin ADR (ADR-*.md), operasyonel kararlar icin decision log kullanilir.
 
 ## Klasor Yapisi
 
@@ -109,10 +139,21 @@ docs/agents/
 ├── requirements/
 │   └── US-001-*.md
 ├── decisions/
-│   └── ADR-001-*.md
+│   ├── ADR-001-*.md        ← Mimari kararlar (ADR)
+│   └── decision-log-*.md  ← Orkestrasyon kararlari (@sef)
 ├── contracts/
 │   └── *-contract.md
 ├── handoffs/
+│   └── *.md
+├── runtime/
+│   ├── state-events.jsonl
+│   ├── agent-invocation.json
+│   └── evidence-command-map.json
+├── quality-gates/
+│   └── *.md
+├── failures/
+│   └── *.md
+├── state-snapshots/
 │   └── *.md
 └── reviews/
     └── *.md
@@ -122,8 +163,10 @@ docs/agents/
 
 Bir agent basarisiz olursa @sef otomatik olarak:
 1. Hata turunu tespit eder
-2. Risk seviyesine gore retry veya eskalasyon uygular
-3. 3 kumulatif hata veya guvenlik riski → DURDUR
-4. Kullaniciya durum raporu verir
+2. Workflow-state icindeki sayaclari gunceller
+3. Risk seviyesine gore retry veya eskalasyon uygular
+4. 3 kumulatif hata veya guvenlik riski → DURDUR
+5. Gerekirse plan/release onayi veya human loop checkpoint'ine doner
+6. Kullaniciya durum raporu verir
 
 Detay: `orchestration-policies.mdc`

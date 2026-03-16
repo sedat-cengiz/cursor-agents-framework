@@ -229,6 +229,49 @@
           "description": "Minimum risk level that triggers human-in-the-loop confirmation",
           "enum": ["low", "medium", "high", "critical"],
           "default": "high"
+        },
+        "runtime": {
+          "type": "object",
+          "description": "Runtime execution and evidence settings for the deterministic @sef runner.",
+          "properties": {
+            "executionMode": {
+              "type": "string",
+              "enum": ["command", "synthetic"],
+              "default": "command"
+            },
+            "agentCommandTemplate": {
+              "type": "string",
+              "description": "Command template used to execute one internal agent. Supports tokens like {{agent}}, {{handoff_path}}, {{output_path}}, {{job_id}}, {{execution_id}}."
+            },
+            "agentRunnerScriptPath": {
+              "type": "string",
+              "description": "Project-local runner script that receives normalized runtime parameters and dispatches one internal agent."
+            },
+            "agentInvocationConfigPath": {
+              "type": "string",
+              "description": "Optional JSON file mapping internal agents to executable commands for scripts/run-agent.ps1."
+            },
+            "stackAdapter": {
+              "type": "string",
+              "enum": ["generic", "dotnet", "node", "python"],
+              "default": "generic"
+            },
+            "workingDirectory": {
+              "type": "string",
+              "description": "Working directory for runtime evidence commands and agent execution. Relative paths are resolved from project root."
+            },
+            "evidenceCommandMapPath": {
+              "type": "string",
+              "description": "Optional JSON file path overriding built-in gate evidence commands."
+            },
+            "agentTimeoutSeconds": {
+              "type": "integer",
+              "minimum": 30,
+              "maximum": 3600,
+              "default": 300
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

@@ -1,0 +1,18 @@
+{
+  "G4": {
+    "build_status": "Write-Error 'Configure build_status command in docs/agents/runtime/evidence-command-map.json'; exit 2",
+    "lint_status": "Write-Error 'Configure lint_status command in docs/agents/runtime/evidence-command-map.json'; exit 2",
+    "security_status": "Write-Error 'Configure security_status command in docs/agents/runtime/evidence-command-map.json'; exit 2",
+    "documentation_status": "if (Test-Path 'docs/agents') { exit 0 } else { exit 1 }"
+  },
+  "G5": {
+    "test_status": "Write-Error 'Configure test_status command in docs/agents/runtime/evidence-command-map.json'; exit 2",
+    "coverage_status": "Write-Error 'Configure coverage_status command in docs/agents/runtime/evidence-command-map.json'; exit 2",
+    "documentation_status": "if (Test-Path 'docs/agents') { exit 0 } else { exit 1 }"
+  },
+  "G6": {
+    "review_status": "if ((Test-Path 'docs/agents/reviews') -or (Test-Path 'docs/agents/quality-gates')) { exit 0 } else { exit 1 }",
+    "security_status": "Write-Error 'Configure security_status command in docs/agents/runtime/evidence-command-map.json'; exit 2",
+    "documentation_status": "if (Test-Path 'docs/agents') { exit 0 } else { exit 1 }"
+  }
+}

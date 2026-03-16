@@ -27,6 +27,29 @@ Sef her istekte asagidaki YURUTME DONGUSUNU otomatik baslatir:
 ISTEK AL → SINIFLANDIR → YONLENDIR → PLANLA → [KAPI → AGENT → DOGRULA → STATE]* → OZET
 ```
 
+### Enforcement-First Orkestrasyon
+
+Bu framework'te `@sef`, sadece tavsiye veren bir rehber degil; zorunlu kayit, gate ve state disiplininin sahibidir.
+
+- Kullaniciya gorunen tek koordinasyon noktasi `@sef`'tir.
+- Diger agent'lar kullanici deneyiminin parcasi degil, `@sef` tarafindan yonetilen ic uzmanlik katmanidir.
+- Kritik kararlar decision log olmadan alinmis sayilmaz.
+- Gate kararları evidence olmadan gecti sayilmaz.
+- Failure policy, state sayaçlari guncellenmeden uygulanmis sayilmaz.
+- Traceability; workflow-state, decision log, quality gate report ve failure report arasinda capraz referansla kurulur.
+- Runtime event log (`docs/agents/runtime/state-events.jsonl`) olmadan gate/gecis kesinlesmis sayilmaz.
+- Desteklenen canli runtime yolu: `feature`, `bugfix`, `refactor`. Bu akislarda `@sef`, handoff yazip execution adapter uzerinden agent cagirir; sentetik output ana yolda kullanilmaz.
+
+### Zorunlu Orkestrasyon Artefact Seti
+
+Aktif bir iste `@sef` asgari olarak su kayitlari yonetir:
+
+1. `docs/agents/workflow-state.md`
+2. `docs/agents/decisions/decision-log-*.md`
+3. `docs/agents/quality-gates/*.md`
+4. `docs/agents/failures/*.md` (gerektiginde)
+5. `docs/agents/state-snapshots/*.md` (checkpoint, failure, hard stop)
+
 ---
 
 ## ADIM 1: IS SINIFLANDIRMA MOTORU
@@ -74,6 +97,12 @@ Kapsam: [S|M|L|XL]
 Risk: [dusuk|orta|yuksek|kritik]
 Agent Hatti: [agent listesi]
 ```
+Kullanicidan onay istemeden once bu karari decision log'a kaydet:
+- `decision_topic`: `work_classification`
+- `chosen_path`: secilen is_turu + kapsam + risk + agent hatti
+- `rejected_alternatives`: degerlendirilen diger is turleri / agent hatlari
+- `related_state_ref`: `docs/agents/workflow-state.md`
+
 Kullanicidan **onay** iste. Onay gelmeden yurutmeye BASLANMAZ.
 
 ---
@@ -165,6 +194,7 @@ devops → [UYGULAMA KAPISI] → review → [REVIEW KAPISI]
 ## ADIM 3: KALITE KAPISI PROTOKOLU
 
 Her kapi, bir sonraki adima gecmeden ONCE kontrol edilen zorunlu kontrol noktasidir.
+Kapi sonucu yalnizca anlatimla verilmez; `@sef`, quality gate raporunda evidence alanlarini doldurur ve sonucu workflow-state'e yazar.
 
 ### Kapi Tanimlari
 
@@ -202,6 +232,21 @@ DURDUR    → Yurutmeyi durdur, kullaniciya rapor ver, onay bekle
 ```
 
 Detayli kapi kriterleri ve basarisizlik politikasi: `orchestration-policies.mdc`
+
+### Evidence Zorunlulugu
+
+Her quality gate raporunda asgari su alanlar bulunur:
+
+- `build_status`
+- `lint_status`
+- `test_status`
+- `coverage_status`
+- `review_status`
+- `security_status`
+- `documentation_status`
+
+Evidence statuleri `verified | not_verified | pending | skipped_with_reason` olarak tutulur.
+Bir gate, kendi zorunlu evidence alanlari `verified` olmadan GECTI sayilmaz. `skipped_with_reason` sadece policy tarafindan atlanabilir tanimlanan durumlarda kullanilir.
 
 ---
 
@@ -245,6 +290,7 @@ Subagent cagrisinda belirt:
 2. Handoff dosya yolu (`docs/agents/handoffs/`)
 3. Workspace path
 4. Okunmasi gereken dokumanlar (requirements, contracts, decisions)
+5. Handoff contract versiyonu ve beklenen output schema yolu (`docs/agents/agent-outputs/*.json`)
 
 **4.2a. Paralel adimlar (∥):** Hat diyagraminda `∥` ile gosterilen adimlar (ornegin backend ∥ frontend) **ayni anda** yurutulur:
 1. Her paralel agent icin ayri handoff hazirla (4.1); ortak bagimlilik kontrat olmali (bkz. `orchestration-policies.mdc` § Paralel adim bagimliligi).
@@ -258,6 +304,7 @@ Agent ciktisini asagidaki kontrol listesine gore dogrula:
 - [ ] Beklenen cikti uretildi mi?
 - [ ] Handoff'taki DoD karsilandi mi?
 - [ ] Format ve icerik standartlara uygun mu?
+- [ ] Agent output, `agent-outputs/*.json` schema'sina uyuyor mu?
 - [ ] Mimari ihlal var mi?
 - [ ] Guvenlik riski var mi?
 
@@ -266,16 +313,49 @@ Basarisiz ise: **Hata Politikasini** uygula (bkz. `orchestration-policies.mdc`).
 ### 4.4. State Guncelle
 
 Her adim sonrasi `docs/agents/workflow-state.md` dosyasini guncelle:
-- Aktif adim ve durum
-- Tamamlanan adimlarin ciktilari
-- Degisen dosyalar / API'ler / DB semalari
-- Acik riskler ve blocker'lar
+- `job_id`, `title`, `job_type`, `scope`, `risk_level`, `current_phase`
+- `selected_agents`, `active_gate`, `completed_gates`, `failed_gates`
+- `failure_counters`, `retry_allowed`, `escalation_required`, `human_in_loop_status`
+- `major_decisions`, `changed_contracts`, `changed_components`, `changed_data_model`
+- `test_status`, `review_status`, `open_risks`, `next_action`
+
+State yalnizca not degildir; sonraki adim secimi, retry siniri, escalation ve hard stop kararlari state uzerinden verilir.
 
 ### 4.5. Kapi Kontrol Et
 
 Mevcut adim bir kapi oncesi ise, kapi kriterlerini kontrol et.
 **Giris DoR:** Kapıya girmeden once ilgili DoR maddelerini kontrol et (bkz. `orchestration-policies.mdc` § Definition of Ready); eksik varsa once giderilir.
+Her gate kararinda:
+1. `docs/agents/quality-gates/` altinda rapor olustur veya guncelle
+2. Evidence alanlarini statuleri ve kanit referanslariyla doldur
+3. `decision_id` ve `state_ref` ekle
+4. Sonucu workflow-state icinde `completed_gates` veya `failed_gates` alanina yaz
+
 Gecti → sonraki adim. Kaldi → basarisizlik aksiyonu.
+
+### 4.6. Decision Log (Karar Kaydi)
+
+Onemli operasyonel kararlarda `docs/agents/decisions/` altinda decision log kaydi olustur veya guncelle. Sablon: framework `templates/doc-templates/_template-decision-log.md`.
+**Kaydedilmesi gereken karar anlari:**
+- Siniflandirma sonucu (tur, kapsam, risk) — neden bu sinif secildi, alternatifler nelerdi
+- Agent hatti secimi — neden bu agent'lar, neden atlandi (ornegin mimari atlandi)
+- Kapi gecisi veya kaldi — gecti/kaldi gerekcesi; kapi atlama karari (is turune gore) ve gerekcesi
+- Eskalasyon veya DURDUR karari — neden, hangi politika tetiklendi
+
+Her kayitta asgari su alanlar bulunur:
+- `decision_id`
+- `timestamp`
+- `job_id`
+- `decision_topic`
+- `chosen_path`
+- `rejected_alternatives`
+- `rationale`
+- `risk_level`
+- `impacted_agents_or_layers`
+- `related_gate_refs`
+- `related_state_ref`
+
+Kalite kapisi raporu ve hata raporu doldurulurken ilgili decision log girdisine referans ver.
 
 ---
 
@@ -286,6 +366,7 @@ Gecti → sonraki adim. Kaldi → basarisizlik aksiyonu.
 State `docs/agents/workflow-state.md` icinde tutulur (genisletilmis format).
 
 **KURAL:** Sadece @sef state YAZAR. Diger agentlar state OKUR ve sonuclarini Sef'e raporlar.
+**KURAL:** State bozuksa veya zorunlu alanlar eksikse `@sef` sonraki adima gecmez; once state duzeltilir veya kullaniciya donulur.
 
 ### State Icerigi
 
@@ -299,6 +380,8 @@ Son Guncelleme: YYYY-MM-DD HH:MM
 - **Tur:** [feature|bugfix|refactor|...]
 - **Kapsam:** [S|M|L|XL]
 - **Risk:** [dusuk|orta|yuksek|kritik]
+- **Current Phase:** [classification|analysis|architecture|implementation|testing|review|release|blocked]
+- **Human-in-loop:** [not_required|pending_user|engaged|resolved]
 
 ## Agent Hatti ve Ilerleme
 | # | Agent | Durum | Cikti | Kapi |
@@ -315,6 +398,8 @@ Son Guncelleme: YYYY-MM-DD HH:MM
 - **API Degisiklikleri:** [yeni/degisen endpoint'ler]
 - **DB Degisiklikleri:** [migration, yeni tablo/kolon]
 - **Kontrat Degisiklikleri:** [breaking change var/yok]
+- **Changed Components:** [modul/sinif/servis listesi]
+- **Changed Data Model:** [var/yok + ozet]
 
 ## Test Durumu
 - Unit: [yazildi/bekliyor/gecti/kaldi]
@@ -329,7 +414,13 @@ Son Guncelleme: YYYY-MM-DD HH:MM
 ## Hata Sayaci
 - Toplam Hata: 0/3 (3'te DURDUR)
 - Son Hata: —
+- Asama Hatasi: 0
+- Son Basarisiz Kapi: —
+- Retry Allowed: [evet/hayir]
+- Escalation Required: [evet/hayir]
 ```
+
+State dosyasi serbest sekilli not degildir; `templates/doc-templates/workflow-state.md` ve `scripts/validate-orchestration.ps1` ile uyumlu alan adlari korunur.
 
 ---
 
@@ -364,6 +455,11 @@ Tum adimllar tamamlanip son kapi gecilince kullaniciya su formatta ozet ver:
 | G5 Test | GECTI |
 | G6 Review | GECTI |
 | G7 Yayin | KULLANICI ONAYI BEKLENIYOR |
+
+### Kritik Kararlar ve Traceability
+- **Decision loglari:** [kritik decision_id listesi]
+- **Failure report'lari:** [varsa referanslar]
+- **Workflow state:** `docs/agents/workflow-state.md`
 ```
 
 ---

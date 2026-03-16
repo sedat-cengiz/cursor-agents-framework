@@ -20,6 +20,8 @@ echo ""
 
 TARGET_RULES="$PROJECT_PATH/.cursor/rules"
 TARGET_DOCS="$PROJECT_PATH/docs/agents"
+TARGET_RUNTIME="$PROJECT_PATH/runtime"
+TARGET_SCRIPTS="$PROJECT_PATH/scripts"
 
 if [ ! -d "$FRAMEWORK_PATH/core" ]; then
     echo "  ERROR: Framework core not found at $FRAMEWORK_PATH" >&2
@@ -27,6 +29,8 @@ if [ ! -d "$FRAMEWORK_PATH/core" ]; then
 fi
 
 mkdir -p "$TARGET_RULES"
+mkdir -p "$TARGET_RUNTIME"
+mkdir -p "$TARGET_SCRIPTS"
 
 # Check for manifest
 MANIFEST=""
@@ -144,16 +148,25 @@ else
 fi
 
 # ═══════════════════════════════════════
-# STEP 5: Learning + Docs
+# STEP 5: Learning + Runtime + Docs
 # ═══════════════════════════════════════
 echo ""
-echo "  [5/6] Learning system + docs structure..."
+echo "  [5/6] Learning system + runtime + docs structure..."
 
 cp -f "$FRAMEWORK_PATH/learning/agent-learning.mdc" "$TARGET_RULES/"
+cp -Rf "$FRAMEWORK_PATH"/runtime/* "$TARGET_RUNTIME/"
+cp -f "$FRAMEWORK_PATH/scripts/validate.ps1" "$TARGET_SCRIPTS/" 2>/dev/null || true
+cp -f "$FRAMEWORK_PATH/scripts/validate-orchestration.ps1" "$TARGET_SCRIPTS/" 2>/dev/null || true
+cp -f "$FRAMEWORK_PATH/scripts/run-agent.ps1" "$TARGET_SCRIPTS/" 2>/dev/null || true
+cp -f "$FRAMEWORK_PATH/agents.manifest.schema.json" "$PROJECT_PATH/" 2>/dev/null || true
 
-for sub in "" requirements decisions contracts handoffs reviews; do
+for sub in "" requirements decisions contracts handoffs reviews quality-gates failures state-snapshots runtime agent-outputs; do
     mkdir -p "$TARGET_DOCS/$sub"
 done
+
+cp -f "$FRAMEWORK_PATH/templates/runtime/agent-invocation.json" "$TARGET_DOCS/runtime/" 2>/dev/null || true
+cp -f "$FRAMEWORK_PATH/templates/runtime/evidence-command-map.json" "$TARGET_DOCS/runtime/" 2>/dev/null || true
+cp -f "$FRAMEWORK_PATH/templates/doc-templates/_schema-agent-output.json" "$TARGET_DOCS/agent-outputs/" 2>/dev/null || true
 
 if [ -d "$FRAMEWORK_PATH/standards" ]; then
     cp -f "$FRAMEWORK_PATH"/standards/*.md "$TARGET_DOCS/" 2>/dev/null || true
@@ -163,7 +176,11 @@ fi
 [ -f "$TARGET_DOCS/taskboard.md" ]       || printf "# Gorev Tablosu\nSon Guncelleme: $(date +%Y-%m-%d)\n\n### BACKLOG\n\n### IN PROGRESS\n\n### DONE\n" > "$TARGET_DOCS/taskboard.md"
 [ -f "$TARGET_DOCS/workflow-state.md" ]   || printf "# Workflow State\nAktif Faz: Analiz\nSon Guncelleme: $(date +%Y-%m-%d)\n" > "$TARGET_DOCS/workflow-state.md"
 
-echo "        ✓ Learning + docs/agents/ structure created"
+if [ ! -f "$TARGET_RULES/project-config.mdc" ] && [ -f "$FRAMEWORK_PATH/templates/project-config-template.mdc" ]; then
+    cp -f "$FRAMEWORK_PATH/templates/project-config-template.mdc" "$TARGET_RULES/project-config.mdc"
+fi
+
+echo "        ✓ Learning + docs/agents/ + project-local runtime created"
 
 # ═══════════════════════════════════════
 # STEP 6: Aliases

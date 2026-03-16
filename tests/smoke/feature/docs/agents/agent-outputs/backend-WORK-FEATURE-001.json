@@ -1,0 +1,9 @@
+{
+  "agent": "@backend",
+  "job_id": "WORK-FEATURE-001",
+  "status": "success",
+  "produced_outputs": [
+    "src/backend/order-service.ts"
+  ],
+  "summary": "Backend implementation completed."
+}

@@ -1,0 +1,10 @@
+{
+  "agent": "@backend",
+  "job_id": "WORK-REFACTOR-001",
+  "status": "success",
+  "produced_outputs": [
+    "src/backend/order-application-service.ts",
+    "src/backend/order-domain-service.ts"
+  ],
+  "summary": "Refactor retry completed."
+}
