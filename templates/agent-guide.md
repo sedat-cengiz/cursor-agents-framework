@@ -61,24 +61,23 @@ Detay: `orchestrator.mdc` ve `orchestration-policies.mdc`. Tam ornek akislar (fe
 
 ### Enforcement Katmani
 
-Bu proje artik deterministik bir runtime kullanir. `feature`, `bugfix` ve `refactor` akislari icin `@sef` su omurga uzerinden ilerler:
+`feature`, `bugfix` ve `refactor` akislari icin `@sef` su omurga uzerinden ilerler:
 
-- serbest metin istegi intake katmaninda normalize eder
-- plan ve release onaylarini ayri checkpoint olarak yazar
-- filtrelenmis handoff yazar
-- project-local `scripts/run-agent.ps1` uzerinden ilgili agent'i cagirir
-- normalize edilmis agent output kontratini dogrular
-- gate evidence komutlarini calistirir
-- runtime event log, workflow-state, decision log, gate report ve failure report arasinda bag kurar
-- ayni `execution_id` ile resume eder; tamamlanmis adimlari tekrar kosmaz
+- serbest metin istegi siniflandirilir (tur, kapsam, risk)
+- plan ve release onaylari kullanicidan alinir
+- her agent adimi icin filtrelenmis handoff yazilir
+- `mcp_task` ile ilgili Cursor subagent'i baslatilir
+- agent ciktisi dogrulanir
+- gate evidence kontrol edilir
+- workflow-state, decision log, gate report ve failure report arasinda bag kurulur
+- ayni `execution_id` ile resume edilir; tamamlanmis adimlar tekrar kosulmaz
 
-Desteklenen dar ama gercek yol:
+Desteklenen gercek yol:
 - `feature`
 - `bugfix`
 - `refactor`
 
-Not: `generic` evidence adapter artik build/test/security icin fail-closed davranir. Gercek gate gecisi icin `dotnet`, `node`, `python` veya ozel command map kullanin.
-Not: Gercek agent kosumu icin proje icinde `docs/agents/runtime/agent-invocation.json` doldurulmalidir.
+`scripts/run-agent.ps1` ve `docs/agents/runtime/agent-invocation.json` bu modda kullanilmaz; agent cagrisi dogrudan `mcp_task` ile yapilir.
 
 ### Ornek Akis: Yeni Ozellik (feature)
 

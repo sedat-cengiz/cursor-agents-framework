@@ -9,14 +9,18 @@
     Target project root directory. Defaults to current directory.
 .PARAMETER ManifestPath
     Path to agents.manifest.json. If present, skips interactive prompts.
+.PARAMETER Quick
+    Sorusuz kurulum: dotnet + react + testing, domain yok. Manifest gerekmez.
 .EXAMPLE
     .\install.ps1 -ProjectPath "D:\MyProject"
+    .\install.ps1 -ProjectPath "D:\MyProject" -Quick
     .\install.ps1 -ManifestPath "D:\MyProject\agents.manifest.json"
 #>
 
 param(
     [string]$ProjectPath = (Get-Location).Path,
-    [string]$ManifestPath = ""
+    [string]$ManifestPath = "",
+    [switch]$Quick
 )
 
 $ErrorActionPreference = "Stop"
@@ -61,9 +65,24 @@ New-Item -ItemType Directory -Path $TargetRules -Force | Out-Null
 New-Item -ItemType Directory -Path $TargetRuntime -Force | Out-Null
 New-Item -ItemType Directory -Path $TargetScripts -Force | Out-Null
 
-# --- Manifest-driven or interactive ---
+# --- Manifest-driven, Quick, or interactive ---
 $manifest = $null
-if ($ManifestPath -and (Test-Path $ManifestPath)) {
+if ($Quick) {
+    $projectName = Split-Path $ProjectPath -Leaf
+    $manifest = [PSCustomObject]@{
+        projectName = $projectName
+        platform    = "My application"
+        layers      = [PSCustomObject]@{
+            technology = @("dotnet", "react", "testing")
+            domain     = @()
+        }
+        aliases     = [PSCustomObject]@{
+            backend  = "tech-dotnet"
+            frontend = "tech-react"
+        }
+    }
+    Write-Host "  Quick mode: dotnet + react + testing (no prompts)" -ForegroundColor Green
+} elseif ($ManifestPath -and (Test-Path $ManifestPath)) {
     $manifest = Get-Content $ManifestPath -Raw | ConvertFrom-Json
     Write-Host "  Using manifest: $ManifestPath" -ForegroundColor Green
 } elseif (Test-Path (Join-Path $ProjectPath "agents.manifest.json")) {

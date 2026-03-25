@@ -72,42 +72,30 @@ Current honest scope:
 
 ## Quick Start
 
-### 1. Install the Framework
-
-```bash
-git clone https://github.com/sedat-cengiz/cursor-agents-framework.git
-
-# Install as Cursor skill
-# Windows:
-xcopy /E /I cursor-agents-framework "%USERPROFILE%\.cursor\skills\cursor-agents-framework"
-# macOS/Linux:
-cp -r cursor-agents-framework ~/.cursor/skills/cursor-agents-framework
-```
-
-### 2. Set Up a New Project
+### En basit yol (2 komut)
 
 ```powershell
-# Interactive installer
+# 1) Framework'ü bir kez kur
+git clone https://github.com/sedat-cengiz/cursor-agents-framework.git "$env:USERPROFILE\.cursor\skills\cursor-agents-framework"
+
+# 2) Yeni proje klasöründe kur (-Quick = soru sormaz, dotnet+react+testing)
+cd D:\MyProject
+& "$env:USERPROFILE\.cursor\skills\cursor-agents-framework\scripts\install.ps1" -ProjectPath . -Quick
+```
+
+Projeyi Cursor'da açıp chat'te **`@sef "yapılacak iş"`** yazın. İsterseniz `.cursor/rules/global-conventions.mdc` içinde proje adını düzenleyin.
+
+### Manifest veya interaktif kurulum
+
+```powershell
+# Manifest ile (proje kökünde agents.manifest.json varsa otomatik okunur)
 .\scripts\install.ps1 -ProjectPath "D:\MyProject"
 
-# Or via Cursor chat:
-# "Install agents framework. Stack: .NET + React. Domain: WMS"
+# İnteraktif (teknoloji/domain seçimi sorar)
+.\scripts\install.ps1 -ProjectPath "D:\MyProject"
 ```
 
-### 3. Configure Your Project
-
-Edit `.cursor/rules/global-conventions.mdc`:
-- Set your project name and platform description
-- Adjust technology stack if needed
-- Review communication language settings
-
-### 4. Start Working
-
-```
-@sef "add user authentication with JWT"
-```
-
-That's it. `@sef` will parse the user request, classify the work, select the internal agents, persist approval checkpoints, manage workflow-state, apply quality gates, and deliver the final user-facing summary.
+Detay: [Yeni Proje Ekleme ve Kullanım](docs/YENI-PROJE-EKLEME-VE-KULLANIM.md).
 
 ## Orchestration Architecture
 
@@ -291,6 +279,8 @@ Proje kokunde `agents.manifest.json` kullanin. IDE otomatik tamamlama ve dogrula
 | [Getting Started](docs/GETTING-STARTED.md) | Quick start for new users |
 | [Configuration](docs/CONFIGURATION.md) | Manifest schema, overrides, customization |
 | [New Project Setup](docs/NEW-PROJECT-SETUP.md) | Step-by-step project bootstrap |
+| [Basit Kurulum](docs/BASIT-KURULUM.md) | 1–2–3 adım: ilk kurulum + yeni projede ne yapacaksın (TR) |
+| [Yeni Proje Ekleme ve Kullanım](docs/YENI-PROJE-EKLEME-VE-KULLANIM.md) | Framework'ü yeni projeye ekleme ve günlük kullanım (TR) |
 | [Migration Guide](docs/MIGRATION-GUIDE.md) | Migrating from jeager-agents v1/v2 or v3.x |
 | [Creating Domain Pack](docs/CREATING-DOMAIN-PACK.md) | How to add new domain knowledge |
 | [Creating Tech Pack](docs/CREATING-TECH-PACK.md) | How to add new technology packs |

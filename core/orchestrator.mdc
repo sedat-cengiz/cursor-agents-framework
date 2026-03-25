@@ -37,8 +37,8 @@ Bu framework'te `@sef`, sadece tavsiye veren bir rehber degil; zorunlu kayit, ga
 - Gate kararları evidence olmadan gecti sayilmaz.
 - Failure policy, state sayaçlari guncellenmeden uygulanmis sayilmaz.
 - Traceability; workflow-state, decision log, quality gate report ve failure report arasinda capraz referansla kurulur.
-- Runtime event log (`docs/agents/runtime/state-events.jsonl`) olmadan gate/gecis kesinlesmis sayilmaz.
-- Desteklenen canli runtime yolu: `feature`, `bugfix`, `refactor`. Bu akislarda `@sef`, handoff yazip execution adapter uzerinden agent cagirir; sentetik output ana yolda kullanilmaz.
+- Her agent adimi `mcp_task` ile ayri bir Cursor subagent olarak baslatilir; `scripts/run-agent.ps1` ve `agent-invocation.json` bu modda kullanilmaz.
+- Desteklenen canli runtime yolu: `feature`, `bugfix`, `refactor`. Bu akislarda `@sef`, handoff yazip `mcp_task` ile ilgili agent'i cagirir; sentetik output ana yolda kullanilmaz.
 
 ### Zorunlu Orkestrasyon Artefact Seti
 
@@ -285,18 +285,40 @@ Agent'a gondermeden once filtrelenmis handoff hazirla:
 
 ### 4.2. Agent Cagir
 
-Subagent cagrisinda belirt:
-1. Rol adi ve hedef .mdc dosyasi
-2. Handoff dosya yolu (`docs/agents/handoffs/`)
-3. Workspace path
-4. Okunmasi gereken dokumanlar (requirements, contracts, decisions)
-5. Handoff contract versiyonu ve beklenen output schema yolu (`docs/agents/agent-outputs/*.json`)
+Her agent adimi icin `mcp_task` ile bir Cursor subagent baslatilir. `scripts/run-agent.ps1` veya `agent-invocation.json` bu modda kullanilmaz.
 
-**4.2a. Paralel adimlar (∥):** Hat diyagraminda `∥` ile gosterilen adimlar (ornegin backend ∥ frontend) **ayni anda** yurutulur:
+**Siralamali adim icin mcp_task sablon:**
+
+```
+mcp_task(
+  description: "[rol-adi] adimi — WORK-{ID}",
+  prompt: """
+    Rol: [Rol Adi]
+    Bu adimda [kural-dosyasi].mdc kurallarini tam olarak uygula.
+    Workspace: [proje-koku-yolu]
+
+    Handoff dosyasini oku ve talimatlara uy:
+      docs/agents/handoffs/[handoff-dosyasi].md
+
+    Beklenen cikti: [ne uretmeli — dosya, dokuman, test vb.]
+
+    Definition of Done:
+    - [bu adim icin tamamlanma kriterleri]
+  """
+)
+```
+
+**4.2a. Paralel adimlar (∥):** Hat diyagraminda `∥` ile gosterilen adimlar (ornegin backend ∥ frontend) **ayni turda** iki ayri `mcp_task` cagrisi ile baslatilir:
+
+```
+mcp_task(description: "backend adimi — WORK-{ID}", prompt: "Rol: Backend Gelistirici ...")
+mcp_task(description: "frontend adimi — WORK-{ID}", prompt: "Rol: Frontend Gelistirici ...")
+```
+
 1. Her paralel agent icin ayri handoff hazirla (4.1); ortak bagimlilik kontrat olmali (bkz. `orchestration-policies.mdc` § Paralel adim bagimliligi).
-2. Her iki (veya daha fazla) agent'i **ayni turda** cagir — Cursor ortami paralel subagent destekliyorsa (ornegin `mcp_task` ile coklu cagri) ayni anda baslat; desteklemiyorsa sirayla cagirip sonuclari topla.
-3. **Bulusma:** Tum paralel agent'lar tamamlanana kadar sonuc bekle; hepsi bittikten sonra tek seferde 4.3 (Ciktiyi Dogrula), 4.4 (State Guncelle), 4.5 (Kapi Kontrol) uygula.
-4. Paralel grupta bir agent basarisiz olursa Hata Politikasi o agent icin uygulanir; duzeltme sonrasi gerekirse sadece o agent tekrar cagrilir, digerleri bekletilmez (state'te durum guncel tutulur).
+2. Her iki `mcp_task`'i **ayni turda** cagir; ikisi de tamamlanana kadar bekle.
+3. **Bulusma:** Tum paralel agent'lar tamamlaninca tek seferde 4.3 (Ciktiyi Dogrula), 4.4 (State Guncelle), 4.5 (Kapi Kontrol) uygula.
+4. Paralel grupta bir agent basarisiz olursa Hata Politikasi o agent icin uygulanir; duzeltme sonrasi gerekirse sadece o agent icin yeni `mcp_task` baslatilir, digerleri bekletilmez.
 
 ### 4.3. Ciktiyi Dogrula
 
