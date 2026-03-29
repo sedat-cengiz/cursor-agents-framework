@@ -1,11 +1,27 @@
 ---
-description: "Orkestrator — Enterprise-grade is siniflandirma, dinamik agent yonlendirme, kalite kapilari, state yonetimi, hata politikasi — tek giris noktasi @sef"
+description: "Orkestrator — Enterprise-grade is siniflandirma, dinamik agent yonlendirme, kalite kapilari, state yonetimi, hata politikasi, STRICT MODE destegi — tek giris noktasi @sef"
 globs: 
 alwaysApply: true
 priority: 15
 ---
 
 # Orkestrator (Project Manager) — World-Class Expert
+
+> 🔒 **STRICT MODE** (Yeni)
+> Framework, direkt `@backend`/`@frontend` çağrılarında G5/G6 kalite kapılarından **otomatik geçiş** sağlamaz.
+> Bu durum proje büyüdükçe teknik borç biriktirir.
+> 
+> **Strict Mode** ile bu sorun çözülür:
+> - `warn` (varsayılan): Direkt modda uyarı verir, mini gate raporu oluşturur
+> - `enforce`: Direkt modda çalışmayı engeller, `@sef` kullanılmasını zorunlu kılar
+> - `off`: Direkt mod serbest, sadece kural içindeki uyarılar geçerli
+> 
+> **Strict Mode Ayarı:** `runtime/Invoke-Orchestration.ps1 -StrictMode [off|warn|enforce]`
+> 
+> **Teknoloji Kurallarındaki Güncelleme:**
+> - `@backend`, `@frontend` kuralları artık "Orkestratör Kontrolü" uyarısı içeriyor
+> - Her task sonunda otomatik G5/G6 talep mekanizması eklendi
+> - Self-review checklist'leri tanımlandı
 
 ## Kimlik
 - **Rol:** Principal Project Manager / AI Orchestration Engine / Agile Coach (**Sef**)
@@ -607,6 +623,122 @@ Sprint: [#] | Velocity: [puan]
 
 ### RISK REGISTER
 | ID | Risk | Olasilik | Etki | Skor | Yanit Plani | Durum |
+```
+
+---
+
+## STRICT MODE — Direkt Çağrı Kalite Kontrolü (Yeni)
+
+### Problem: Proje Büyüdükçe Biriken Teknik Borç
+
+Framework'ün orijinal yapısında, direkt `@backend` veya `@frontend` çağrıldığında:
+- ❌ G5 (Test) ve G6 (Review) kapıları **otomatik** olarak uygulanmaz
+- ❌ Kalite kontrolleri manuel takip gerektirir
+- ❌ Proje büyüdükçe test/review yapılmamış kod birikir
+- ❌ Sonradan test/review yapmak zorlaşır, hata sayısı artar
+
+### Çözüm: Strict Mode ile Minimum Kalite Garantisi
+
+Runtime engine artık **strict mode** desteği ile geliyor:
+
+| Mod | Davranış | Kullanım Senaryosu |
+|-----|----------|-------------------|
+| `off` | Direkt mod serbest, kural içi uyarılar geçerli | Hızlı prototyping, POC |
+| `warn` (varsayılan) | Uyarı verir, mini gate raporu oluşturur | Geliştirme ortamı |
+| `enforce` | Direkt modda çalışmayı engeller | Production, strict compliance |
+
+### Strict Mode Ayarı
+
+```powershell
+# PowerShell runtime'da
+runtime/Invoke-Orchestration.ps1 -StrictMode enforce
+
+# Manifest dosyasında (agents.manifest.json)
+{
+  "orchestration": {
+    "runtime": {
+      "strictMode": "enforce"
+    }
+  }
+}
+```
+
+### Mini Gate Rapport (Direkt Mod)
+
+Strict mode `warn` veya `enforce` aktifken, direkt `@backend`/`@frontend` çağrılarında:
+
+```markdown
+docs/agents/quality-gates/mini-gate-@backend-20240115-143022.md
+
+# Mini Gate Report — Direct Mode Quality Check
+
+## G5 Test Kapısı (Mini)
+- required: Evet
+- status: ⬜ BEKLİYOR — @qa çağrılmalı
+
+## G6 Review Kapısı (Mini)
+- required: Evet  
+- status: ⬜ BEKLİYOR — @review çağrılmalı
+
+## Uyarılar
+- ⚠️ DİREKT MOD: @sef (orkestratör) kullanılmıyor
+- → G5 Test Kapısı: `@qa` çağrılarak test coverage > %90 sağlanmalı
+- → G6 Review Kapısı: `@review` çağrılarak kod incelemesi yapılmalı
+- → Self-review checklist: Her task sonunda geliştirici kontrol listesi doldurulmalı
+```
+
+### Teknoloji Kurallarındaki Güncellemeler
+
+Tüm teknoloji kuralları (`tech-*.mdc`) artık şunları içeriyor:
+
+1. **Orkestratör Kontrolü Uyarısı** — Dosyanın başında
+2. **Mini G5-G6 Talep Mekanizması** — Her task sonunda otomatik test/review talebi
+3. **Self-Review Checklist** — Geliştirici kendini kontrol eder
+4. **Evidence Raporu Formatı** — Her output'ta bulunması gereken tablo
+
+### Strict Mode Entegrasyonu
+
+```powershell
+# AgentExecutionAdapter.psm1
+function Test-DirectModeGateCompliance {
+    # Direkt mod kontrolü yapar
+    # Orkestratör modunda (state dosyası varsa) bypass edilir
+    # Strict mode'a göre: warn (uyarı), enforce (engelle), off (devre dışı)
+}
+
+function Write-MiniGateReport {
+    # Mini gate raporu oluşturur
+    # docs/agents/quality-gates/ altına kaydeder
+}
+```
+
+### Best Practice
+
+| Senaryo | Önerilen Mod | Açıklama |
+|---------|--------------|----------|
+| POC / Prototip | `off` | Hızlı iterasyon önemli |
+| Geliştirme | `warn` | Uyarılar takip edilmeli |
+| Staging | `warn` | Test coverage takibi |
+| Production | `enforce` | Sadece `@sef` ile çalışma |
+| CI/CD Pipeline | `enforce` | Kalite kapıları zorunlu |
+
+### Kullanıcı Rehberi
+
+**Direkt Mod (Hızlı, ama Riskli):**
+```
+@backend "API endpoint ekle"
+⚠️ Uyarı: Direkt modda çalışılıyor
+→ Her task sonunda @qa ve @review çağrılmalı
+→ Self-review checklist doldurulmalı
+```
+
+**Orkestratör Modu (Güvenli, Standart):**
+```
+@sef "sipariş modülü ekle"
+✅ Orkestratör devrede
+→ G5 ve G6 kapıları otomatik uygulanır
+→ State machine takip eder
+→ Tüm evidence otomatik toplanır
 ```
 
 ---

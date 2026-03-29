@@ -23,7 +23,8 @@ param(
     [string]$EvidenceCommandMapPath = "",
     [string]$WorkingDirectory = "",
     [int]$AgentTimeoutSeconds = 0,
-    [switch]$AutoApproveUserDecisions
+    [switch]$AutoApproveUserDecisions,
+    [ValidateSet("off","warn","enforce")][string]$StrictMode = "warn"  # NEW: Strict mode for direct agent calls
 )
 
 $ErrorActionPreference = "Stop"
@@ -60,6 +61,14 @@ $StackAdapter = [string]$runtimeConfig.stack_adapter
 $EvidenceCommandMapPath = [string]$runtimeConfig.evidence_command_map_path
 $AgentCommandTemplate = [string]$runtimeConfig.agent_command_template
 $executionMode = [string]$runtimeConfig.execution_mode
+
+# STRICT MODE: Add strict mode to runtime config
+$runtimeConfig.strict_mode = $StrictMode
+
+# Log strict mode status at startup
+if ($StrictMode -ne "off") {
+    Write-Host "STRICT MODE [$StrictMode]: Direct agent calls without orchestrator will trigger quality gate checks." -ForegroundColor Yellow
+}
 
 function New-GeneratedJobId {
     param(
@@ -1262,13 +1271,72 @@ for ($index = 0; $index -lt $script:state.pipeline.Count; $index++) {
             } -IdempotencySuffix "agent-$($step.agent)-$($step.step_id)"
         }
 
-        $execution = Invoke-AgentExecution -Agent $step.agent -JobId $JobId -ExecutionId $ExecutionId -StepId $step.step_id -GateId $groupGate -DocsPath $DocsPath -HandoffPath $handoff.path -OutputPath $outputPath -WorkingDirectory $WorkingDirectory -ExecutionMode $executionMode -CommandTemplate $AgentCommandTemplate -JobType $JobType -Scope $Scope -RiskLevel $RiskLevel -TimeoutSeconds $runtimeConfig.agent_timeout_seconds
+        # STRICT MODE CHECK: Before executing agent, check if this is a direct quality-requiring agent
+# Note: In orchestrated mode (through @sef), this check is bypassed as gates are managed by state machine
+$gateCompliance = Test-DirectModeGateCompliance -Agent $step.agent -DocsPath $DocsPath -StrictMode $runtimeConfig.strict_mode
+if (-not $gateCompliance.compliant -and $runtimeConfig.strict_mode -eq "enforce") {
+    # In strict mode, block execution if compliance check fails
+    $policy = Get-FailureAction -FailureType "insufficient_context" -RiskLevel $RiskLevel -FailureCountCurrentStage 0 -FailureCountTotal 0
+    Resolve-PolicyTransition -PolicyDecision $policy -FailureType "strict_mode_violation" -GateId $groupGate
+    Write-Host "STRICT MODE ENFORCED: Agent $($step.agent) blocked. Use @sef orchestrator for production work." -ForegroundColor Red
+    $groupSucceeded = $false
+    break
+}
+# Log warnings if any
+if ($gateCompliance.warnings.Count -gt 0) {
+    Write-Host ($gateCompliance.warnings -join "`n") -ForegroundColor Yellow
+    # Write mini gate report for tracking
+    $miniGateRef = Write-MiniGateReport -DocsPath $DocsPath -Agent $step.agent -GateCheck $gateCompliance
+}
+
+$execution = Invoke-AgentExecution -Agent $step.agent -JobId $JobId -ExecutionId $ExecutionId -StepId $step.step_id -GateId $groupGate -DocsPath $DocsPath -HandoffPath $handoff.path -OutputPath $outputPath -WorkingDirectory $WorkingDirectory -ExecutionMode $executionMode -CommandTemplate $AgentCommandTemplate -JobType $JobType -Scope $Scope -RiskLevel $RiskLevel -TimeoutSeconds $runtimeConfig.agent_timeout_seconds
+        
+        # AUTO-FOLLOWUP: Check if auto quality chain is enabled
+        $autoFollowup = Test-AutoFollowupEnabled -DocsPath $DocsPath -Agent $step.agent -RuntimeConfig $runtimeConfig
+        if ($autoFollowup.enabled -and $execution.ok) {
+            Write-Host "`n[AUTO-FOLLOWUP] Quality chain enabled for $($step.agent). Auto-triggering @qa → @review..." -ForegroundColor Cyan
+            
+            $followupResults = Invoke-AutoFollowupChain `
+                -Agent $step.agent `
+                -JobId $JobId `
+                -ExecutionId $ExecutionId `
+                -DocsPath $DocsPath `
+                -WorkingDirectory $WorkingDirectory `
+                -ParentStep $step `
+                -CommandTemplate $AgentCommandTemplate `
+                -TimeoutSeconds $runtimeConfig.agent_timeout_seconds
+            
+            # Write auto-followup report
+            $autoFollowupRef = Write-AutoFollowupReport -DocsPath $DocsPath -Agent $step.agent -Results $followupResults -JobId $JobId
+            
+            # Update evidence status based on followup results
+            if ($followupResults.final_status -eq "success") {
+                $script:state.evidence_status.test_status = "verified"
+                $script:state.evidence_status.coverage_status = "verified"
+                $script:state.evidence_status.review_status = "verified"
+                $script:state.test_status_summary = "passed"
+                $script:state.review_status_summary = "passed"
+                Write-Host "[AUTO-FOLLOWUP] ✅ Quality chain completed successfully!" -ForegroundColor Green
+            } else {
+                Write-Host "[AUTO-FOLLOWUP] ⚠️ Quality chain incomplete: $($followupResults.final_status)" -ForegroundColor Yellow
+            }
+            
+            Add-BookkeepingEvent -EventType "auto_followup_completed" -Payload @{
+                agent = $step.agent
+                followup_status = $followupResults.final_status
+                qa_invoked = $followupResults.qa_invoked
+                review_invoked = $followupResults.review_invoked
+                report_ref = $autoFollowupRef
+            } -IdempotencySuffix "followup-$($step.agent)-$($step.step_id)"
+        }
+        
         Add-BookkeepingEvent -EventType "agent_result" -Payload @{
             agent = $step.agent
             gate = $groupGate
             output_ref = "docs/agents/agent-outputs/$outputFileName"
             command = $execution.command
             exit_code = $execution.exit_code
+            auto_followup_enabled = $autoFollowup.enabled
         } -IdempotencySuffix "agent-result-$($step.agent)-$($step.step_id)-$($script:state.failure_count_total)"
 
         $contractCheck = Test-AgentOutputContract -OutputPath $outputPath

@@ -7,6 +7,15 @@ priority: 40
 
 # React Frontend Expert — World-Class
 
+> ⚠️ **ORKESTRATOR KONTROLÜ** ⚠️
+> Bu kural direkt `@frontend` çağrıldığında yüklenir. Kalite kapıları (G5 Test, G6 Review) **otomatik olarak** uygulanmaz.
+> 
+> **Öneri:** Production işleri için `@sef` (orkestratör) üzerinden çalışın: `@sef "dashboard ekranı ekle"`
+> 
+> **Direkt modda:** Her task sonunda bu kural, test ve review talep eder (aşağıya bakın).
+
+---
+
 ## Kimlik
 - **Rol:** Senior Frontend Developer / React Architect
 - **Uzmanlik:** React 19, TypeScript 5.x, Vite 6, Ant Design 5, TanStack Query v5, Zustand, react-hook-form, Zod, i18n, accessibility
@@ -257,3 +266,369 @@ src/WebApp/
 | Initial bundle | < 500KB gzip |
 | Route chunk | < 100KB each |
 | Re-render | Component only when props change |
+
+---
+
+## 🚨 G5-G6 KALİTE KAPISI — HER TASK SONUNDA ZORUNLU
+
+### Direkt Mod Kontrolü (Orkestratör Dışı Çalışma)
+
+Eğer bu kural direkt `@frontend` olarak çağrıldıysa, **her task tamamlandığında** aşağıdaki kontroller otomatik olarak yapılır:
+
+#### Mini G5 — Test Durumu Kontrolü (Zorunlu)
+
+Task tamamlandığında, aşağıdaki evidence tablosu **HER OUTPUT'TA** bulunmalı:
+
+```markdown
+## Evidence Report — Mini G5 (Test)
+
+| Evidence | Durum | Kanıt | Not |
+|----------|-------|-------|-----|
+| test_status | ⬜ pending | Test dosyaları: `**/*.test.{ts,tsx}` | @qa çağrılmadı |
+| coverage_status | ⬜ pending | Coverage: __% | @qa çağrılmadı |
+| unit_tests | ⬜ pending | `vitest` / `jest` | Elle yazılmalı |
+| component_tests | ⬜ pending | `@testing-library/react` | Elle yazılmalı |
+| e2e_tests | ⬜ pending | Playwright / Cypress | Kritik path'ler için |
+
+### Otomatik Test Talebi
+
+Bu task sonrası **ZORUNLU** olarak aşağıdaki adımları talep et:
+
+1. **@qa agentını çağır:** `@qa "[TASK-ADI] için unit ve component testleri yaz"`
+2. **Test coverage hedefi:** Components > %80, Critical paths %100
+3. **Test stratejisi:**
+   - Component rendering ve interaction testleri
+   - Custom hooks testleri
+   - Form validation testleri (Zod schema)
+   - TanStack Query hooks testleri (mock API)
+   - Error boundary testleri
+   - Accessibility (a11y) testleri
+```
+
+#### Mini G6 — Review Durumu Kontrolü (Zorunlu)
+
+```markdown
+## Evidence Report — Mini G6 (Review)
+
+| Evidence | Durum | Kanıt | Not |
+|----------|-------|-------|-----|
+| review_status | ⬜ pending | Reviewer: @review | @review çağrılmadı |
+| security_status | ⬜ pending | XSS check | Elle kontrol edilmeli |
+| a11y_status | ⬜ pending | WCAG 2.1 AA | Elle kontrol edilmeli |
+| self_review | ⬜ pending | Checklist aşağıda | Geliştirici yapmalı |
+
+### Self-Review Checklist (Geliştirici Yapar)
+
+Task'ı "tamamlandı" olarak işaretlemeden ÖNCE:
+
+- [ ] **Design:** 
+  - [ ] Component pattern tutarlı mı?
+  - [ ] Props interface tanımlı mı?
+  - [ ] Re-render optimization yapıldı mı?
+- [ ] **Functionality:**
+  - [ ] Edge case'ler (loading, error, empty state) kontrol edildi mi?
+  - [ ] Error boundary ile sarmalandı mı?
+- [ ] **Security:**
+  - [ ] XSS önlemi var mı?
+  - [ ] Input sanitization var mı?
+- [ ] **Performance:**
+  - [ ] Gereksiz re-render var mı?
+  - [ ] Lazy loading kullanıldı mı?
+- [ ] **Tests:**
+  - [ ] Component render testi var mı?
+  - [ ] User interaction testleri var mı?
+  - [ ] Hook testleri var mı?
+- [ ] **Accessibility:**
+  - [ ] Alt text'ler var mı?
+  - [ ] Keyboard navigation çalışıyor mu?
+  - [ ] ARIA label'lar doğru mu?
+- [ ] **TypeScript:**
+  - [ ] `any` type kullanılmamış mı?
+- [ ] **i18n:**
+  - [ ] Hardcoded string yok mu?
+
+### Otomatik Review Talebi
+
+Self-review tamamlandıktan sonra **ZORUNLU** olarak:
+
+1. **@review agentını çağır:** `@review "[TASK-ADI] için kod incelemesi yap"`
+2. **Review kapsamı:**
+   - 360° review (Design, Functionality, Security, Performance, Tests, A11y)
+   - MUST-FIX bulguları varsa düzelt
+   - React 19 best practice'lerine uygunluk
+```
+
+#### Sonuç Raporu Formatı (Her Output'ta Zorunlu)
+
+```markdown
+---
+
+## 📋 KALİTE KAPISI ÖZETİ — @frontend Direkt Mod
+
+| Kapı | Durum | Sonraki Adım |
+|------|-------|--------------|
+| G4 Uygulama | ✅ Tamamlandı | Kod yazıldı |
+| G5 Test | ⬜ BEKLİYOR | `@qa` çağrılmalı |
+| G6 Review | ⬜ BEKLİYOR | `@review` çağrılmalı |
+
+### Risk Uyarısı
+> Direkt modda çalışılıyor. Kalite kapıları otomatik değil, **manuel talep** gerektiriyor.
+> Production kod için `@sef` orkestratörü kullanın.
+
+### Sonraki Adımlar
+1. `@qa "[TASK] için testler yaz"` — Test coverage hedefi components > %80
+2. `@review "[TASK] için review yap"` — MUST-FIX bulgu kalmamalı
+3. Test ve review tamamlandıktan sonra task kapatılabilir
+
+**Not:** Bu task G5 (Test) ve G6 (Review) kapılarından geçmeden "bitti" sayılmaz.
+```
+
+---
+
+## ⚡ OTOMATIK MOD — @qa/@review Zinciri (YENİ)
+
+Eğer kullanıcı **otomatik kalite zinciri** istiyorsa, her frontend task'i sonrası şu akış otomatik olarak çalışır:
+
+```
+@frontend "[TASK]"
+  ↓ (otomatik trigger)
+@qa "[TASK] için component ve hook testleri yaz — coverage > %80"
+  ↓ (otomatik trigger - testler başarılıysa)
+@review "[TASK] için kod incelemesi yap — G5 testimiz var"
+  ↓ (review tamamlandıktan sonra)
+✅ Task kapanabilir
+```
+
+### Otomatik Çalışma Kuralları
+
+**1. Frontend Task Tamamlandığında Otomatik:**
+
+Herhangi bir UI değişikliği tamamlandığında, aşağıdaki agent'lar **otomatik olarak** çağrılır:
+
+```
+🤖 OTOMASYON ZİNCİRİ BAŞLATILIYOR...
+
+Adım 1: @frontend kodu yazdı ✓
+Adım 2: @qa otomatik çağrılıyor... ⏳
+       └─> Component coverage > %80 sağlanana kadar devam et
+Adım 3: @review otomatik çağrılıyor... ⏳  
+       └─> MUST-FIX bulgu kalmayana kadar devam et
+Adım 4: (Mode B - Yarı-Otomatik) MUST-FIX bulunursa ↺
+       └─> @frontend OTOMATİK çağrılır, düzeltme yapar
+       └─> @review tekrar kontrol eder
+       └─> 3 döngüye kadar devam eder
+Adım 5: ✅ Tüm G5/G6 kapıları geçildi, task tamamlandı
+```
+
+**2. Otomatik @qa Çağrısı (Task: Test Yazımı):**
+
+```
+Görev: "[TASK-ADI] için component ve hook testleri yaz"
+Hedef: Coverage > %80 (Components), Critical paths %100
+Zorunlu:
+  - Component rendering testleri
+  - User interaction testleri (click, type, submit)
+  - Custom hooks testleri
+  - Form validation testleri (Zod)
+  - TanStack Query hooks (mock API)
+  - Error boundary testleri
+  - Accessibility (a11y) testleri
+Test Framework: Vitest/Jest + @testing-library/react
+Sonuç: Testler çalıştırılmalı, coverage raporu üretilmeli
+```
+
+**3. Otomatik @review Çağrısı (Task: Kod İncelemesi):**
+
+```
+Görev: "[TASK-ADI] için kod incelemesi yap — G5 testimiz var"
+Hedef: MUST-FIX bulgu kalmamalı
+Kapsam: 360° review
+  - Design (Component pattern, Props interface)
+  - Functionality (Edge cases: loading, error, empty)
+  - Security (XSS, Input sanitization)
+  - Performance (Re-render, Lazy loading)
+  - Tests (Coverage, Component tests)
+  - Accessibility (Alt text, Keyboard nav, ARIA, Contrast)
+  - TypeScript (any kullanımı yok)
+  - i18n (Hardcoded string yok)
+Sonuç: Review raporu + MUST-FIX listesi (varsa)
+```
+
+**4. Döngü Mantığı:**
+
+```
+BAŞLA
+  ↓
+@frontend kod yazar
+  ↓
+OTOMATIK: @qa çağrılır
+  ↓
+Component coverage > %80?
+  ├── HAYIR → @qa testleri tamamlar, tekrar dene
+  └── EVET → OTOMATIK: @review çağrılır
+                ↓
+           MUST-FIX var?
+             ├── EVET → @frontend düzeltir, tekrar başa dön
+             └── HAYIR → ✅ Task tamamlandı
+```
+
+### Otomatik Mod Aktivasyonu
+
+**A. Manuel Talep (Varsayılan):**
+```bash
+@frontend "Dashboard ekranı ekle"
+# Sonuç: Uyarı mesajı + manuel @qa/@review talebi
+```
+
+**B. Otomatik Mod (Kullanıcı İsteği Üzerine):**
+```bash
+@frontend "Dashboard ekranı ekle — otomatik test ve review ile"
+# Sonuç: Frontend → Otomatik @qa → Otomatik @review zinciri
+```
+
+**C. Global Ayar (Manifest Dosyasında):**
+```json
+{
+  "orchestration": {
+    "runtime": {
+      "autoQualityChain": true,
+      "autoQA": true,
+      "autoReview": true
+    }
+  }
+}
+```
+
+**D. Cursor Chat Komutu:**
+```
+"Bu işi otomatik test ve review ile yap"
+→ Frontend kodu yaz
+→ @qa otomatik çağrılır  
+→ @review otomatik çağrılır
+→ Sonuç raporu
+```
+
+### Otomatik Mod Talimatı (Frontend Agent için)
+
+**Her task sonunda otomatik olarak:**
+
+1. **Mini Gate Raporu** oluştur (durum: pending)
+2. **@qa agentını çağır** — Task: Component ve hook testleri
+3. **Test sonuçlarını bekle** — Coverage > %80 kontrolü
+4. **@review agentını çağır** — Task: Kod incelemesi  
+5. **Review sonuçlarını bekle** — MUST-FIX kontrolü
+6. **Final rapor** — Tüm kapıların durumu
+
+```markdown
+## 🤖 Otomatik Çalışma Logu
+
+[14:30:15] @frontend: Kod yazımı tamamlandı
+[14:30:16] AUTO: @qa çağrılıyor...  
+[14:35:42] @qa: Component testleri yazıldı (coverage: 85%) ✅
+[14:35:43] AUTO: @review çağrılıyor...
+[14:38:19] @review: Kod incelendi, 2 MUST-FIX bulundu
+[14:38:20] AUTO: Düzeltme için @frontend'e geri dönülüyor...
+[14:40:05] @frontend: Düzeltme tamamlandı
+[14:40:06] AUTO: @review tekrar çağrılıyor...
+[14:42:33] @review: MUST-FIX kalmadı ✅
+[14:42:34] ✅ TÜM KALİTE KAPILARI TAMAMLANDI
+
+## 📊 Sonuç Özeti
+| Kapı | Durum | Coverage | Review |
+|------|-------|----------|--------|
+| G4 Uygulama | ✅ | - | - |
+| G5 Test | ✅ | 85% | - |
+| G6 Review | ✅ | - | Approved |
+```
+
+### Fallback (Yedek) Senaryolar
+
+**1. @qa Başarısız Olursa:**
+- Component coverage < %80 ise → @qa'ye retry verilir
+- 3 deneme sonrası → Kullanıcıya eskalasyon
+
+**2. @review MUST-FIX Bulursa:**
+- @frontend'e geri dönülür
+- Düzeltme yapılır
+- @review tekrar çağrılır
+
+**3. Döngü Kırma (Loop Prevention):**
+- Max 3 döngü (frontend→qa→review→frontend)
+- Sonrasında kullanıcı onayı gerekir
+
+---
+
+### 🔧 Mod B: Yarı-Otomatik Düzeltme (Semi-Automatic Fix Mode)
+
+**Varsayılan davranış:** MUST-FIX bulunursa rapor edilir, siz düzeltmeniz beklenir.
+
+**Mode B (Yarı-Otomatik):** MUST-FIX bulunursa **otomatik olarak** @frontend çağrılır ve düzeltme yapılır.
+
+#### Mode B Akışı
+
+```
+@frontend "Dashboard ekranı ekle"
+  ↓
+@qa otomatik çağrılır → Coverage: 85% ✅
+  ↓
+@review otomatik çağrılır → 2 MUST-FIX buldu ⚠️
+  ↓ [MODE B AKTİF]
+OTOMATIK: @frontend çağrılıyor (Fix Loop 1/3) 🔧
+  ↓
+MUST-FIX'ler düzeltiliyor:
+  1. Props validation eklendi
+  2. useEffect memory leak giderildi
+  ↓
+@review tekrar kontrol ediyor... 🔍
+  ↓
+MUST-FIX kaldı mı?
+  ├── EVET (2. loop) → @frontend tekrar çağrılır
+  └── HAYIR → ✅ Task tamamlandı!
+```
+
+#### Mode B Özellikleri
+
+| Özellik | Açıklama |
+|---------|----------|
+| **Otomatik Tespit** | @review MUST-FIX'leri listeler |
+| **Otomatik Düzeltme** | @frontend MUST-FIX'leri otomatik düzeltir |
+| **Re-Review** | Her düzeltmeden sonra @review tekrar kontrol eder |
+| **Max 3 Loop** | Sonsuz döngüyü önlemek için max 3 düzeltme döngüsü |
+| **Manual Fallback** | 3 loop yeterli olmazsa kullanıcı devralır |
+
+#### Mode B Log Örneği
+
+```
+🤖 OTOMASYON ZİNCİRİ (MODE B - Yarı-Otomatik)
+
+[14:30:15] @frontend: Kod yazımı tamamlandı ✓
+[14:30:16] AUTO: @qa çağrılıyor...  ⏳
+[14:35:42] @qa: Component testleri yazıldı (coverage: 85%) ✅
+[14:35:43] AUTO: @review çağrılıyor... ⏳
+
+[14:38:19] @review: Kod incelendi, 2 MUST-FIX bulundu ⚠️
+         └─ MUST-FIX #1: Props validation eksik (Dashboard.tsx:23)
+         └─ MUST-FIX #2: useEffect cleanup yok (useDashboard.ts:45)
+
+[14:38:20] [MODE B] OTOMATİK DÜZELTME BAŞLATILIYOR... 🔧
+[14:38:21] AUTO-FIX: @frontend çağrılıyor (Fix Loop 1/3)
+
+[14:40:05] @frontend: Düzeltme tamamlandı ✓
+         └─ Props validation eklendi (Dashboard.tsx)
+         └─ useEffect cleanup eklendi (useDashboard.ts)
+
+[14:40:06] AUTO: @review tekrar çağrılıyor (Re-Review)... 🔍
+[14:42:33] @review: Kontrol tamamlandı ✅
+         └─ MUST-FIX #1: ✅ Düzeltildi
+         └─ MUST-FIX #2: ✅ Düzeltildi
+         └─ Yeni MUST-FIX: Yok
+
+[14:42:34] ✅ TÜM KALİTE KAPILARI TAMAMLANDI (Mode B - 1 fix loop)
+```
+
+### Önemli Notlar
+
+- **Otomatik mod** yavaş ama güvenlidir
+- Her adım tamamlanmadan sonrakine geçilmez
+- Kullanıcı istediği an döngüyü durdurup manuel devam edebilir
+- Strict mode ile birlikte kullanıldığında en yüksek kalite garantisi sağlanır
