@@ -12,6 +12,19 @@ priority: 16
 
 ---
 
+## ⛔ KAPI ZORUNLULUĞU — EN YÜKSEK ÖNCELİK
+
+Bu dosyadaki tüm kurallar, `orchestrator.mdc` ile birlikte çalışır ve **birbirini tamamlar**.
+
+### Kapı Geçişi İçin Altın Kurallar
+
+1. **Evidence olmadan GEÇTİ yoktur:** Her `verified` için gerçek komut çıktısı, test logu veya review notu gerekir. @sef bunu tahmin edemez.
+2. **Kullanıcıya görünür olmalı:** Her kapı geçişinde kullanıcıya "KAPI DEĞERLENDİRMESİ" çıktısı MUTLAKA gösterilir.
+3. **Sıra bozulamaz:** G4 bitmeden G5, G5 bitmeden G6 başlamaz — hiçbir gerekçe bu sırayı değiştiremez.
+4. **"Küçük iş" istisnası yoktur:** Kapsam S bile olsa G4, G5, G6 kapıları zorunludur.
+
+---
+
 ## MINIMAL ENFORCEMENT KATMANI
 
 Bu framework deterministik runtime + validator kombinasyonu ile calisir; kritik orkestrasyon davranislari makine tarafindan denetlenebilir olmalidir.

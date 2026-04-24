@@ -8,13 +8,15 @@
 ```
 Kullanici → @sef "su ozelligi ekle"
   → Sef: Is siniflandirir (tur, kapsam, risk)
-  → Sef: Agent hattini belirler
-  → Sef: Kullanicidan onay ister
-  → Sef: Kalite kapilari ile adim adim yurutur
+  → Sef: Kullanicidan ONAY ister — ONAY GELMEDEN DEVAM ETMEZ
+  → Sef: Her adimda "KAPI KONTROL NOKTASI" ciktisi uretir
+  → Sef: Kapi gecmeden bir sonraki agent CAGIRILMAZ
   → Sef: Kullaniciya final ozet verir
 ```
 
 Kullanici diger agent'lari dogrudan cagirmaz. `@sef` gerekli agent'lari otomatik secer, yonlendirir, state'i gunceller ve gerekiyorsa gate / failure / decision kayitlari uretir.
+
+> ⛔ **Kapi Zorunluluğu:** G4 geçmeden @qa, G5 geçmeden @review çağrılamaz. Bu kural "küçük iş" veya "acele var" gerekçesiyle DELİNEMEZ.
 Runtime artik serbest metin kullanici isteginden `job_type`, `scope`, `risk_level`, etkilenen katmanlar ve onay checkpoint'leri cikarir; sonra baglama gore minimal agent set secer.
 
 ## Rol / Kural Eslemesi
